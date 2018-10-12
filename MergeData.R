@@ -19,6 +19,7 @@ ReefFishers <- read.csv('ReefFishers.csv')
 Saltmarsh <- read.csv('SaltmarshMeanArea_180316.csv')
 ChondLand <- read.csv('TotalLandings_180512.csv')
 Wgi <- read.csv('WorldGovInd_180515.csv')
+pprod <- read.csv('PProdRaw_181012.csv')
 
 # Can't merge sst data with this dataset because there's a different
 # value for each country depending on the range of the species in the region
@@ -30,6 +31,22 @@ iso <-
   distinct(ISO, .keep_all = TRUE) %>%
   mutate(ISO3 = ISO) %>%
   select(-ISO)
+
+# Clean GIS-derived data and scale all 3 productivity values
+PriProd <-
+  pprod %>%
+  select(-OBJECTID, -FREQUENCY) %>%
+  dplyr::rename(ISO3 = ISO_Ter1, PprodMean = MEAN_PPROD, PprodMax = MAX_PPROD, 
+                PprodMin = MIN_PPROD) %>%
+  mutate(PprodMeanScale = PprodMean) %>%
+  mutate_at('PprodMeanScale', funs(scale(.) %>% 
+                                     as.vector)) %>%
+  mutate(PprodMaxScale = PprodMax) %>%
+  mutate_at('PprodMaxScale', funs(scale(.) %>%
+                                    as.vector)) %>%
+  mutate(PprodMinScale = PprodMin) %>%
+  mutate_at('PprodMinScale', funs(scale(.) %>% 
+                                    as.vector))
 
 # Rename NBI column #
 BioInd <-
@@ -113,7 +130,8 @@ Iuu <-
                                as.vector))
 
 # Clean columns, calculate impact, and scale mangrove loss #
-# No need to reverse direction of mangrove loss because it's reflected in the impact calculation #
+# No need to reverse direction of mangrove loss because it's reflected 
+# in the impact calculation 
 Mangrove <-
   Mangrove %>%
   mutate(impact.percentage = ((AreaHa00 - AreaHa1980)/AreaHa1980)*100) %>%
@@ -167,6 +185,7 @@ Wgi <-
 
 CountSum <-
   iso %>%
+  left_join(., PriProd, by = c('ISO3' = 'ISO3')) %>%
   left_join(., BioInd, by = c('ISO3' = 'ISO3')) %>%
   select(-X, -Country.y) %>%
   left_join(., CoastPop, by = c('ISO3' = "ISO3")) %>%
@@ -194,7 +213,8 @@ CountSum <-
   left_join(., Wgi, by = c('ISO3' = 'ISO3')) %>%
   mutate(country = Country.x) %>%
   select(-Country.x) %>%
-  distinct(ISO3, .keep_all = TRUE)
+  distinct(ISO3, .keep_all = TRUE) %>%
+  .[, c(40, 1, 2:39)]
 
 write.csv(CountSum, 'CountryData_180921.csv')
 
@@ -207,7 +227,7 @@ SppCov <-
   SppIso %>%
   left_join(., CountSum, by = c('ISO3' = 'ISO3')) %>%
   select(-country.y) %>%
-  rename(country = country.x) %>%
+  dplyr::rename(country = country.x) %>%
   mutate(matchid = paste(ISO3, species, sep = '-'))
 
 View(SppCov)
@@ -246,8 +266,13 @@ AllCov <-
   SppCov %>%
   left_join(., sstDat, by = c('matchid' = 'matchid2')) %>%
   select(-country.y, -matchid, -occurrence.y, -ISO3.y, -species.y) %>%
-  rename(country = country.x, ISO3 = ISO3.x, species = species.x, 
-         occurrence = occurrence.x)
+  dplyr::rename(country = country.x, ISO3 = ISO3.x, species = species.x, 
+         occurrence = occurrence.x) %>%
+  mutate(refid2 = paste(ISO3, species, sep = '-')) %>%
+  distinct(., refid2, .keep_all = TRUE) %>%
+  select(-refid2)
+
+View(AllCov)
 
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_181011.csv')
+write_csv(AllCov, 'CompleteSpeciesCovariates_181012.csv')
