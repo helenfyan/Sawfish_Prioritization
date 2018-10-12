@@ -8,7 +8,7 @@ library(tidyverse)
 library(devtools)
 library(ggbiplot)
 
-AllData1 <- read.csv('CompleteSpeciesCovariates_181011.csv')
+AllData1 <- read.csv('CompleteSpeciesCovariates_181012.csv')
 
 AllData <-
   AllData1 %>%
@@ -16,7 +16,8 @@ AllData <-
   select(ISO3, NbiScale, CoastPopScale, CoastLengthScale,
          EpiScale, EstDisScale, HkExpScale, ProteinSupScale, GdpScale, HdiScale, 
          OhiScale, IuuScale, ManImpScale, ReefFisherScale, ChondLandScale, WgiScale,
-         SstMeanScale, SstMaxScale, SstMinScale) %>%
+         SstMeanScale, SstMaxScale, SstMinScale, PprodMeanScale, 
+         PprodMaxScale, PprodMinScale) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
 # Can't just drop NAs - need to subset first to keep majority of data
@@ -49,10 +50,10 @@ print(EconPlot)
 bio <-
   AllData %>%
   select(ISO3, CoastLengthScale, EstDisScale, ManImpScale, SstMeanScale,
-         SstMaxScale, SstMinScale) %>%
+         SstMaxScale, SstMinScale, PprodMeanScale, PprodMaxScale, PprodMinScale) %>%
   drop_na()
 
-BioPCA <- prcomp(bio[, c(2:7)], center = FALSE, scale. = FALSE)
+BioPCA <- prcomp(bio[, c(2:10)], center = FALSE, scale. = FALSE)
 
 summary(BioPCA)
 BioPCA
