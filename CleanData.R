@@ -33,6 +33,18 @@ AllSpecies <-
                                  'LT_EP' = 'large')) %>%
   rename(countryUnstd = country)
 
+FormalData <-
+  AllSpecies %>%
+  select(-occurrence) %>%
+  rename(country = countryUnstd) %>%
+  mutate(species = recode(species, 'large' = 'Pristis pristis',
+                          'small' = 'Pristis pectinata',
+                          'green' = 'Pristis zijsron',
+                          'narrow' = 'Anoxypristis cuspidata',
+                          'dwarf' = 'Pristis clavata'))
+
+write_csv(FormalData, 'SawfishOccurrence_181015.csv')
+
 
 # Combine species occurrences with ISO data -------------------------------------------------------------------
 
