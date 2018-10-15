@@ -5,20 +5,20 @@ library(broom)
 
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/')
 
-AllSpecies <- read_csv('CompleteSpeciesCovariates_180924.csv')
+AllSpecies <- read_csv('CompleteSpeciesCovariates_181012.csv')
 
 AllSpecies <-
   AllSpecies %>%
   select(-NBI, -coastal.pop, -Lengthkm, -EPI, -Discharge, -ExporttoHK2010,
          -MeanPro, -GDP, -HDI, -OHI, -UnreportedPercent, -impact.percentage, 
-         -no_reef_fishers, -AreaSqKM, -TotalTonnes, -WGI)
+         -no_reef_fishers, -AreaSqKM, -TotalTonnes, -WGI, -PprodMax, -PprodMin,
+         -PprodMaxScale, -PprodMinScale, -PprodMean, -SstMaxScale, -SstMax,
+         -SstMin, -SstMinScale, -SstMean)
 
 AllSpeciesKnown <-
   AllSpecies %>%
   filter(presence != 'unknown') %>%
-  mutate(species = as.factor(species)) %>%
-  drop_na(NbiScale)
-
+  mutate(species = as.factor(species))
 
 # Make a seperate dataframe of just the covariate per species -----------------
 # Not pretty can probably clean this up 
@@ -35,7 +35,7 @@ df <-
     dataframesp <- 
       AllSpeciesKnown %>%
       filter(species == spe)
-    for(i in 2:17) {
+    for(i in 2:19) {
       df01[[i]] <- paste(vars[6 + i])
       dataframetot[[i]] <- 
         dataframesp %>%
@@ -46,6 +46,7 @@ df <-
   })
 
 df[[1]][[2]]
+df[[5]][[2]]
 
 # GLM for each covariate against each model ----------------------------------------
 
@@ -54,7 +55,7 @@ model <- list()
 vars01 <- list()
 
 for(i in 1:5) {
-  for(j in 2:17) {
+  for(j in 2:19) {
     formula[[j]] <- paste('occurrence', ' ~ ', vars[6 + j])
     model[[i]][[j]] <- glm(formula[[j]], family = binomial, df[[i]][[j]])
     print(tidy(model[[i]][[j]]))
@@ -69,7 +70,7 @@ moddf <- list()
 dwarf <- list()
 dwarfmod <- list()
 
-for(i in 2:17) {
+for(i in 2:19) {
   formula[[i]] <- paste('occurrence', ' ~ ', vars[6 + i])
   moddf[[i]] <- glm(formula[[i]], family = binomial, df[[1]][[i]])
   dwarf[[i]] <- (glance(moddf[[i]]))
@@ -83,11 +84,11 @@ for(i in 2:17) {
 modgr <- list()
 green <- list()
 
-for(i in 2:17) {
+for(i in 2:19) {
   formula[[i]] <- paste('occurrence', ' ~ ', vars[6 + i])
   modgr[[i]] <- glm(formula[[i]], family = binomial, df[[2]][[i]])
   green[[i]] <- (glance(modgr[[i]]))
-  return(green[[2]][[i]])
+  print(green[[i]])
   #modgr[[i]] <- (tidy(model[[i]]))
   #green <- glance(green, modgr[[i]])
 }
@@ -97,7 +98,7 @@ for(i in 2:17) {
 modlt <- list()
 large <- list()
 
-for(i in 2:17) {
+for(i in 2:19) {
   formula[[i]] <- paste('occurrence', ' ~ ', vars[6 + i])
   modlt[[i]] <- glm(formula[[i]], family = binomial, df[[3]][[i]])
   large[[i]] <- (glance(modlt[[i]]))
@@ -112,7 +113,7 @@ for(i in 2:17) {
 modna <- list()
 narrow <- list()
 
-for(i in 2:17) {
+for(i in 2:19) {
   formula[[i]] <- paste('occurrence', ' ~ ', vars[6 + i])
   modna[[i]] <- glm(formula[[i]], family = binomial, df[[4]][[i]])
   print(glance(modna[[i]]))
@@ -126,7 +127,7 @@ for(i in 2:17) {
 modsm <- list()
 small <- list()
 
-for(i in 2:17) {
+for(i in 2:19) {
   formula[[i]] <- paste('occurrence', ' ~ ', vars[6 + i])
   modsm[[i]] <- glm(formula[[i]], family = binomial, df[[5]][[i]])
   print(glance(modsm[[i]]))
@@ -135,327 +136,85 @@ for(i in 2:17) {
 }
 
 
-# Make a figure for each sp for each cov -------------------------------------------------
+# Analysis of SST in relation to EO ----------------------------------------------------
+
+# occurrence ~ SST for each species ------
+tempplot <- list()
+
+for(i in 1:5) {
+    tempplot[[i]] <- ggplot(df[[i]][[19]], aes(x = SstMeanScale, y = occurrence)) +
+      geom_point(size = 3, colour = 'navyblue') +
+      theme_classic() +
+      xlab('SSTmean') +
+      ylab('Presence') +
+      scale_y_continuous(breaks = c(0, 1)) +
+      ggtitle(paste(spp[i]))
+  }
 
 
+# occurrence ~ SST for all species combined ------
 
-# Everything below this doesn't work ------------------------------------------------------
-
-# Create multiple dataframes to drop column-specific NAs -------------------------------
-# make a loop or function to make a dataframe for each covariate 
-
-makedf01 <-
+# checking discrepencies of species and countries - if some are present and some are absent
+AllSstCheck <-
   AllSpeciesKnown %>%
-  select(country, ISO3, region, species, occurrence)
+  #distinct(country, .keep_all = TRUE)
+  select(country, species, occurrence)
 
-covcol <- list()
-makedf <-
-  function(covcol) {
-    for(i in 2:17) {
-      covcol[[i]] <- paste('AllSpeciesKnown$', vars[2], 'AllSpeciesKnown$', vars[6 + i])
-      
-    }
-  }
+l1 <- 
+  AllSstCheck %>%
+  filter(species == 'large')
 
-df1 <- 
-  df <- rbind(makedf01, covcol[[i]], by = c('ISO3' = 'ISO3'))
-return(df)
+s1 <-
+  AllSstCheck %>%
+  filter(species == 'small')
 
+n1 <-
+  AllSstCheck %>%
+  filter(species == 'narrow')
 
-covformula <- list()
-covmodel <- list()
-
-for(i in 2:17) {
-  covformula[[i]] <- paste(vars[6], ' ~ ', vars[6 + i])
-  covmodel[[i]] <- glm(covformula[[i]], family = binomial, AllSpeciesKnown)
-}
-
-covmodeltb <-
-  function(covmodel) {
-    for(i in 2:17) {
-      covformula[[i]] <- paste(vars[6], ' ~ ', vars[6 + i])
-      covmodel[[i]] <- glm(covformula[[i]], family = binomial, AllSpeciesKnown)
-    }
-    return(tidy(covmodel[[i]]))
-  }
-
-covmodeltb(covmodel[[2]])
-
-# try writing function to keep data generic to use in dplyr - this doesn't work
-# either try writing a model with a generic data frame that I call on later
-# or make a loop inside a loop where the first loop calls on a level in species and the second carries model
-# or use lapply to apply the model to each subset for species 
-
-for(i in spp){
-  print(i)
-}
-
-test <-
-  function(spp) {
-    for(i in spp) {
-      for(i in 2:17) {
-        covformula[[i]] <- paste(vars[6], ' ~ ', vars[6 + i])
-        covmodel[[i]] <- glm(covformula[[i]], family = binomial, AllSpeciesKnown)
-      }
-    }
-    return(tidy(covmodel[[i]]))
-  }
-
-test01 <- 
-  AllSpeciesKnown %>%
-  group_by(species) %>%
-  lapply(., function(.) {
-    for(i in 2:17) {
-      covformula[[i]] <- paste(vars[6], ' ~ ', vars[6 + i])
-      covmodel[[i]] <- glm(covformula[[i]], family = binomial, .)
-    }
-  })
-
-
-test02 <-
-  function(sppdf) {
-    for(i in 2:17) {
-      covformula[[i]] <- paste(vars[6], ' ~ ', vars[6 + i])
-      covmodel[[i]] <- glm(covformula[[i]], family = binomial, sppdf)
-    }
-    return(tidy(covmodel[[i]]))
-  }
-
-sppdf <- list()
-
-test03 <-
-  for(i in spp) {
-    datspp[[i]] <- subset(AllSpeciesKnown, species == i)
-    for(j in 2:17) {
-      covformula[[j]] <- paste(vars[6], ' ~ ', vars[6 + j])
-      covmodel[[j]] <- glm(covformula[[j]], family = binomial, datspp[[i]])
-    }
-  }
-
-
-# this subsets the data by species 
-datspp <- list()
-test04 <-
-  for(i in spp) {
-    datspp[[i]] <- subset(AllSpeciesKnown, species == i)
-  }
-
-
-test05 <-
-  for(i in spp) {
-    datspp[[i]] <- subset(AllSpeciesKnown, species == i)
-    for(j in 2:17) {
-      covformula[[j]] <- paste(vars[6], ' ~ ', vars[6 + j])
-      covmodel[[j]] <- glm(covformula[[j]], family = binomial, datspp[[i]])
-    }
-  }
-
-test06 <-
-  for(j in 2:17) {
-    covformula[[j]] <- paste(vars[6], ' ~ ', vars[6 + j])
-    covmodel[[j]] <- glm(covformula[[j]], family = binomial, datspp[[1]])
-  }
-
-covdatasp <- list()
-test07 <-
-  for(i in 2:17) {
-    covformula[[i]] <- paste(vars[6], ' ~ ', vars[6 + i])
-    for(j in 1:5) {
-      covdatasp[[j]] <- paste('datspp', '[[', j, ']]')
-      covmodel[[i]] <- glm(covformula[[i]], family = binomial, covdatasp[[j]])
-    }
-  }
-
-
-
-test08 <-
-  for(i in 1:5) {
-    for(j in 2:17) {
-      datspp[[i]] <- subset(AllSpeciesKnown, species == i)
-      covformula[[j]] <- paste(vars[6], ' ~ ', vars[6 + j])
-      covmodel[[j]] <- glm(covformula[[j]], family = binomial, datspp[[i]])
-    }
-  }
-
-dwarf <- 
-  AllSpeciesKnown %>%
+d1 <-
+  AllSstCheck %>%
   filter(species == 'dwarf')
 
-dwarfformula <- list()
-dwarfmodel <- list()
-
-for(i in 2:17) {
-  dwarfformula[[i]] <- paste(vars[6], ' ~ ', vars[6 + i])
-  dwarfmodel[[i]] <- glm(dwarfformula[[i]], family = binomial, dwarf)
-}
-
-datspp <- data.frame()
-spp01 <- list(AllSpeciesKnown$species)
-
-for(i in 1:5) {
-  datspp[[i]] <- 
-    AllSpeciesKnown %>%
-    filter(species == 'i')
-  print(datspp[[i]])
-}
-
-for(i in 1:5) {
-  spp02[[i]] <- paste(spp[i])
-}
+g1 <-
+  AllSstCheck %>%
+  filter(species == 'green')
 
 
+dupcheck <-
+  l1 %>%
+  left_join(., s1, by = c('country' = 'country')) %>%
+  left_join(., n1, by = c('country' = 'country')) %>%
+  left_join(., d1, by = c('country' = 'country')) %>%
+  left_join(., g1, by = c('country' = 'country')) %>%
+  mutate(sp = paste(species.x, species.y, species.x.x, species.y.y, species, sep = '-')) %>%
+  mutate(oc = paste(occurrence.x, occurrence.y, occurrence.x.x, occurrence.y.y, occurrence,
+                    sep = '-')) %>%
+  select(country, sp, oc)
 
-# ----------------------------------------------------------------------------
+SstChange <-
+  AllSpeciesKnown %>%
+  distinct(country, .keep_all = TRUE) %>%
+  filter(country == c('United States of America', 'Malaysia', 'Oman')) %>%
+  mutate(occurrence = sub('0', '1', occurrence))
 
-df <- list()
-dataframecov <- list()
-spp01 <- list()
+AllSst <-
+  AllSpeciesKnown %>%
+  distinct(country, .keep_all = TRUE) %>%
+  filter(country != c('United States of America', 'Malaysia', 'Oman')) %>%
+  rbind(SstChange) %>%
+  select(-region) %>%
+  mutate(occurrence = as.numeric(occurrence))
 
-for(j in 2:17) {
-  df[[j]] <- paste(vars[6 + j])
-  dataframecov[[j]] <- 
-    AllSpeciesKnown %>%
-    select(country, species, occurrence, df[[j]]) %>%
-    drop_na(vars[6 + j]) %>%
-    mutate(metricname = df[[j]])
-}
+AllSstPlot <- 
+  ggplot(AllSst, aes(x = SstMeanScale, y = occurrence)) +
+  geom_point(size = 3, colour = 'darkslategray', shape = '|') +
+  scale_y_continuous(breaks = c(0, 1)) +
+  ylab('Occurrence') +
+  xlab('SSTmean') +
+  theme_classic()
 
+print(AllSstPlot)
 
-
-
-
-speciesdf <- 
-  lapply(spp, function(spe) {
-    dataframesp <- AllSpeciesKnown %>%
-      filter(species == spe)
-    return(dataframesp)
-  })
-
-
-
-
-no01 <- 
-  lapply(spp, function(spe) {
-    dataframesp <- 
-      AllSpeciesKnown %>%
-      filter(species == spe)
-    for(i in 2:17) {
-      df01[[i]] <- paste(vars[6 + i])
-      dataframetot[[i]] <- 
-        dataframesp %>%
-        select(country, species, occurrence, df01[[i]]) %>%
-        drop_na(vars[6 + i])
-      formula[[i]] <- paste('occurrence', ' ~ ', df01[[i]])
-      model[[i]] <- glm(formula[[i]], family = binomial, dataframetot[[i]])
-    }
-    return(summary(model[[i]]))
-  })
-
-
-no02 <-
-  function(model) {
-    for(i in 1:5) {
-      for(j in 2:17) {
-        formula[[j]] <- paste('occurrence', ' ~ ', vars[6 + j])
-        model[[j]] <- glm(formula[[j]], family = binomial, df[[i]][[j]])
-      }
-    }
-    return(summary(model[[j]]))
-  }
-
-no03 <- 
-  lapply(spp, function(spe) {
-    dataframesp <-
-      AllSpeciesKnown %>%
-      filter(species == spe)
-    for(i in 2:17) {
-      df01[[i]] <- paste(vars[6 + i])
-      dataframetot[[i]] <-
-        dataframesp %>%
-        select(country, species, occurrence, df01[[i]]) %>%
-        drop_na(df01[[i]])
-    }
-    formula[[i]] <- paste('occurrence', ' ~ ', vars[6 + i])
-    model[[i]] <- glm(formula[[i]], family = binomial, dataframetot[[i]])
-    return(summary(model[[i]]))
-  })
-
-
-# this gives the model output for each spp and each cov 
-
-for(i in 1:5) {
-  for(j in 2:17) {
-    formula[[j]] <- paste('occurrence', ' ~ ', vars[6 + j])
-    model[[i]][[j]] <- glm(formula[[j]], family = binomial, df[[i]][[j]])
-  }
-}
-
-for(i in 1:5) {
-  for(j in 2:17) {
-    formula[[j]] <- paste('occurrence', ' ~ ', vars[6 + j])
-    model[[i]][[j]] <- glm(formula[[j]], family = binomial, df[[i]][[j]])
-    print(tidy(model[[i]][[j]]))
-  }
-}
-
-
-
-# try to get model output into df form ---------------------------------------
-
-test <-
-  function(model) {
-    for(i in 1:5) {
-      for(j in 2:17) {
-        formula[[j]] <- paste('occurrence', ' ~ ', vars[6 + j])
-        model[[i]][[j]] <- glm(formula[[j]], family = binomial, df[[i]][[j]])
-        
-      }
-    }
-    return(summary(model))
-  }
-
-
-test(model[[1]][[2]])
-
-test01 <-
-  function(mod) {
-    for(i in 1:5) {
-      for(j in 2:17) {
-        mod <- model[[i]][[j]]
-      }
-    }
-    return(summary(mod))
-  }
-
-#this prints every data frame from above
-dontrun <-
-  for(i in 1:5) {
-    for(j in 2:17) {
-      print(df[[i]][[j]])
-    }
-  }
-
-
-# This is also fucked up because it gives the same values for all i values -----
-
-covmodeltb <-
-  function(covmodel) {
-    for(i in 2:17) {
-      covformula[[i]] <- paste(vars[6], ' ~ ', vars[6 + i])
-      covmodel[[i]] <- glm(covformula[[i]], family = binomial, AllSpeciesKnown)
-      return(tidy(covmodel[[i]]))
-    }
-  }
-
-covmodeltb(covmodel[[2]])
-
-
-
-
-
-
-
-
-
-
-
+modSstAll <- glm(occurrence ~ SstMeanScale, family = binomial, AllSst)
+summary(modSstAll)
