@@ -4,6 +4,7 @@ library(tidyverse)
 library(broom)
 library(reshape2)
 library(car)
+library(MuMIn)
 
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets')
 
@@ -49,8 +50,6 @@ summary(modLarge1)
 modDwarf <- 
   modData %>%
   filter(species == 'dwarf')
-
-View(modDwarf)
 
 modDwarf1 <- glm(formula, family = binomial, modDwarf)
 summary(modDwarf1)
@@ -219,7 +218,7 @@ print(lowertriplot2)
 # Maximum model for each species after removing collinear covariates
 # removed: SSTmin, Coastline length, and HkExp by setting r2 = 0.6 threshold 
 
-covs2 <- vars[c(8, 9, 11, 12:18)]
+covs2 <- vars[c(8, 9, 11, 13:19)]
 formula2 <- paste('occurrence ~ ', paste(covs2, collapse = ' + '))
 
 modLarge2 <- glm(formula2, family = binomial, modLarge)
@@ -329,3 +328,153 @@ test <-
   }))
 
 # don't run this - it freezes RStudio
+
+
+# need to write down the covariates that I'm keeping in the model
+# this is as a result of either the PCA or heatmap (with a r2 = 0.6 threshold)
+
+# Global models for individual species ---------------------------------------------
+
+# Largetooth sawfish ------------------------------------
+options(na.action = na.fail)
+
+gloLargedf <-
+  modLarge %>%
+  select(-HkExpScale) %>%
+  drop_na() 
+
+gloLarge <- glm(formula2, family = binomial, gloLargedf)
+
+gloModLarge <- 
+  dredge(gloLarge) %>%
+  as_tibble(.) %>%
+  filter(delta <= 2) %>%
+  mutate(species = 'largetooth')
+
+write_csv(gloModLarge, 'DredgeLarge_181018.csv')
+
+# Smalltooth sawfish ------------------------------------
+gloSmalldf <-
+  modSmall %>%
+  select(-HkExpScale) %>%
+  drop_na()
+
+gloSmall <- glm(formula2, family = binomial, gloSmalldf)
+
+gloModSmall <-
+  dredge(gloSmall) %>%
+  as_tibble(.) %>%
+  filter(delta <= 2) %>%
+  mutate(species = 'smalltooth')
+
+write_csv(gloModSmall, 'DredgeSmall_181018.csv')
+
+# Narrow sawfish ------------------------------------
+gloNarrowdf <-
+  modNarrow %>%
+  select(-HkExpScale) %>%
+  drop_na()
+
+gloNarrow <- glm(formula2, family = binomial, gloNarrowdf)
+
+gloModNarrow <-
+  dredge(gloNarrow) %>%
+  as_tibble(.) %>%
+  filter(delta <= 2) %>%
+  mutate(species = 'narrow')
+
+write_csv(gloModNarrow, 'DredgeNarrow_181018.csv')
+
+# Green sawfish ------------------------------------
+gloGreendf <-
+  modGreen %>%
+  select(-HkExpScale) %>%
+  drop_na()
+
+gloGreen <- glm(formula2, family = binomial, gloGreendf)
+
+gloModGreen <-
+  dredge(gloGreen) %>%
+  as_tibble(.) %>%
+  filter(delta <= 2) %>%
+  mutate(species = 'green')
+
+write_csv(gloModGreen, 'DredgeGreen_181018.csv')
+
+# Dwarf sawfish ------------------------------------
+gloDwarfdf <-
+  modDwarf %>%
+  select(-HkExpScale) %>%
+  drop_na()
+
+gloDwarf <- glm(formula2, family = binomial, gloDwarfdf)
+
+gloModDwarf <-
+  dredge(gloDwarf) %>%
+  as_tibble(.) %>%
+  filter(delta <= 2) %>%
+  mutate(species = 'dwarf')
+
+write_csv(gloModDwarf, 'DredgeDwarf_181018.csv')
+
+# All species combined -------------------------------------------
+
+NoSpp1 <- read_csv('CountryCovariates_181018.csv')
+
+# number of NAs per column
+sapply(NoSpp1, function(x) sum(is.na(x)))
+
+NoSppAll <-
+  NoSpp1 %>%
+  select(-HdiScale, -OhiScale, -EpiScale, -NbiScale, -SaltmarshScale, -ReefFisherScale,
+         -PprodMinScale, -PprodMaxScale) %>%
+  drop_na()
+
+varsNoSpp <- names(NoSppAll)
+covsNoSppAll <- varsNoSpp[6:17]
+
+formulaNoSppAll <- paste('occurrence ~ ', paste(covsNoSppAll, collapse = ' + '))
+
+gloNoSppAll <- glm(formulaNoSppAll, family = binomial, NoSppAll)
+
+gloModNoSppAll <- 
+  dredge(gloNoSppAll) %>%
+  as_tibble(.) %>%
+  filter(delta <= 2)
+
+write_csv(gloModNoSppAll, '../Results/DredgeAll_181018.csv')
+
+test <- glm(occurrence ~ WgiScale, family = binomial, NoSppAll)
+summary(test)
+
+
+# Number of species per country -------------------------------
+# Not sure if any of this is usable 
+
+formulaNoSppAll2 <- paste('nospecies ~ ', paste(covsNoSppAll, collapse = ' + '))
+
+df <-
+  NoSppAll %>%
+  filter(country != 'United States')
+
+test <- lm(formulaNoSppAll2, df)
+
+test2 <-
+  dredge(test) %>%
+  as_tibble(.) %>%
+  filter(delta <= 2)
+
+View(test2)
+
+
+a <- lm(nospecies ~ CoastLengthScale + WgiScale, df)
+summary(a)
+
+
+p <-
+  ggplot(df, aes(x = WgiScale, y = nospecies)) +
+  geom_point(colour = 'darkslategray', size = 3, alpha = 0.5) +
+  geom_smooth(method = 'lm', formula = y ~ x, colour = 'darkslategray') +
+  theme_classic()
+
+print(p)
