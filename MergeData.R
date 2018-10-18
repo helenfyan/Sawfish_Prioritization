@@ -230,8 +230,6 @@ SppCov <-
   dplyr::rename(country = country.x) %>%
   mutate(matchid = paste(ISO3, species, sep = '-'))
 
-View(SppCov)
-
 sst <- read.csv('SSTRaw_181011.csv', na.strings = ' ')
 
 # Clean data columns and remove unwanted columns
@@ -274,5 +272,66 @@ AllCov <-
 
 View(AllCov)
 
-
 write_csv(AllCov, 'CompleteSpeciesCovariates_181012.csv')
+
+
+# Create generic dataframe that is not species specific --------------------------------
+
+# Country specific ---------
+
+# Calculate the mean of the SST for the country based on
+# the geographic range of the species that resides there -------------------
+
+sstCountry <-
+  sstDat %>%
+  select(c(1:4, 7)) %>%
+  filter(occurrence != '2') %>%
+  mutate(geo = paste(country, ISO3, sep = '-')) %>%
+  select(-country, -ISO3) %>%
+  group_by(geo, occurrence) %>%
+  summarise(SstCountMeanScale = mean(SstMeanScale), 
+            spp = paste(species, collapse = '-'), 
+            sppres = length(species)) %>%
+  mutate(sppres = case_when(occurrence == '0' ~ 0,
+                            TRUE ~ as.numeric(sppres))) %>%
+  select(geo, SstCountMeanScale) %>%
+  separate(col = geo, into = c('country', 'ISO3'), sep = '-')
+  
+head(sstCountry)
+View(sstCountry)
+
+NoSpp <-
+  AllCov %>%
+  select(c(1:7)) %>%
+  select(-c(1, 3, 7), -region, -presence, -country) %>%
+  filter(occurrence !='2') %>%
+  group_by(ISO3, occurrence) %>%
+  summarise(spp = paste(species, collapse = '-'),
+            sppres = length(species)) %>%
+  mutate(sppres = case_when(occurrence == '0' ~ 0,
+                            TRUE ~ as.numeric(sppres))) %>%
+  rename(species = spp, nospecies = sppres) %>%
+  arrange(desc(nospecies)) %>%
+  distinct(., ISO3, .keep_all = TRUE) %>%
+  left_join(., sstCountry, by = c('ISO3' = 'ISO3')) %>%
+  .[, c(5, 1, 3, 4, 2, 6)] %>%
+  left_join(., CountSum, by = c('ISO3' = 'ISO3')) %>%
+  select(-PprodMean, -PprodMax, -PprodMin, -NBI, -coastal.pop, -Lengthkm,
+         -EPI, -Discharge, -ExporttoHK2010, -MeanPro, -GDP, -HDI, -OHI, 
+         -UnreportedPercent, -impact.percentage, -no_reef_fishers, -AreaSqKM,
+         -TotalTonnes, -WGI, -country.y) %>%
+  rename(country = country.x) %>%
+  distinct(., ISO3, .keep_all = TRUE)
+
+write_csv(NoSpp, 'CountryCovariates_181018.csv')
+
+
+
+
+
+
+
+
+
+
+
