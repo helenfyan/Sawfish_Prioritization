@@ -270,8 +270,6 @@ AllCov <-
   distinct(., refid2, .keep_all = TRUE) %>%
   select(-refid2)
 
-View(AllCov)
-
 write_csv(AllCov, 'CompleteSpeciesCovariates_181012.csv')
 
 
@@ -316,14 +314,11 @@ NoSpp <-
   left_join(., sstCountry, by = c('ISO3' = 'ISO3')) %>%
   .[, c(5, 1, 3, 4, 2, 6)] %>%
   left_join(., CountSum, by = c('ISO3' = 'ISO3')) %>%
-  select(-PprodMean, -PprodMax, -PprodMin, -NBI, -coastal.pop, -Lengthkm,
-         -EPI, -Discharge, -ExporttoHK2010, -MeanPro, -GDP, -HDI, -OHI, 
-         -UnreportedPercent, -impact.percentage, -no_reef_fishers, -AreaSqKM,
-         -TotalTonnes, -WGI, -country.y) %>%
+  select(-country.y) %>%
   rename(country = country.x) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
-write_csv(NoSpp, 'CountryCovariates_181018.csv')
+write_csv(NoSpp, 'CountryCovariates_181022.csv')
 
 
 
