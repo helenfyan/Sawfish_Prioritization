@@ -280,7 +280,7 @@ write_csv(AllCov, 'CompleteSpeciesCovariates_181012.csv')
 # Calculate the mean of the SST for the country based on
 # the geographic range of the species that resides there -------------------
 
-sstCountry <-
+sstCountryScaled <-
   sstDat %>%
   select(c(1:4, 7)) %>%
   filter(occurrence != '2') %>%
@@ -294,9 +294,27 @@ sstCountry <-
                             TRUE ~ as.numeric(sppres))) %>%
   select(geo, SstCountMeanScale) %>%
   separate(col = geo, into = c('country', 'ISO3'), sep = '-')
-  
+
+sstCountryRaw <-
+  sstDat %>%
+  select(c(1:3, 8, 7)) %>%
+  filter(occurrence != '2') %>%
+  mutate(geo = paste(country, ISO3, sep = '-')) %>%
+  select(-country, -ISO3) %>%
+  group_by(geo, occurrence) %>%
+  summarise(SstCountMean = mean(SstMean), 
+            spp = paste(species, collapse = '-'), 
+            sppres = length(species)) %>%
+  mutate(sppres = case_when(occurrence == '0' ~ 0,
+                            TRUE ~ as.numeric(sppres))) %>%
+  select(geo, SstCountMean) %>%
+  separate(col = geo, into = c('country', 'ISO3'), sep = '-') %>%
+  distinct(., country, .keep_all = TRUE)
+
+
+
 head(sstCountry)
-View(sstCountry)
+View(sstCountryRaw)
 
 NoSpp <-
   AllCov %>%
@@ -311,8 +329,11 @@ NoSpp <-
   rename(species = spp, nospecies = sppres) %>%
   arrange(desc(nospecies)) %>%
   distinct(., ISO3, .keep_all = TRUE) %>%
-  left_join(., sstCountry, by = c('ISO3' = 'ISO3')) %>%
+  left_join(., sstCountryRaw, by = c('ISO3' = 'ISO3')) %>%
   .[, c(5, 1, 3, 4, 2, 6)] %>%
+  left_join(., sstCountryScaled, by = c('ISO3' = 'ISO3')) %>%
+  select(-country.y) %>%
+  rename(country = country.x) %>%
   left_join(., CountSum, by = c('ISO3' = 'ISO3')) %>%
   select(-country.y) %>%
   rename(country = country.x) %>%
