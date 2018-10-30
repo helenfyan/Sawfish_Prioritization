@@ -1,10 +1,119 @@
 ##### MERGING ALL DATASETS TO CREATE MASTER DATA SET ######
 
-setwd("/users/helenyan/desktop/school/directed studies 2018/datasets")
-
 library(tidyverse)
 
+setwd("/users/helenyan/desktop/school/directed studies 2018/datasets/")
+
 iso <- read.csv('CountryISO3.csv')
+
+# Remove duplicates #
+iso <-
+  iso %>%
+  distinct(ISO, .keep_all = TRUE) %>%
+  mutate(ISO3 = ISO) %>%
+  select(-ISO)
+
+# Clean and merge all SAU fishing gear data
+
+sau1 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ01/SAUEEZ01.csv')
+sau2 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ02/SAUEEZ02.csv')
+sau3 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ03/SAUEEZ03.csv')
+sau4 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ04/SAUEEZ04.csv')
+sau5 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ05/SAUEEZ05.csv')
+sau6 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ06/SAUEEZ06.csv')
+sau7 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ07/SAUEEZ07.csv')
+sau8 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ08/SAUEEZ08.csv')
+sau9 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ09/SAUEEZ09.csv')
+sau10 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ10/SAUEEZ10.csv')
+sau11 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ11/SAUEEZ11.csv')
+sau12 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ12/SAUEEZ12.csv')
+sau13 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ13/SAUEEZ13.csv')
+sau14 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ14/SAUEEZ14.csv')
+sau15 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ15/SAUEEZ15.csv')
+
+SauClean <-
+  rbind(sau1, sau2, sau3, sau4, sau5, sau6, sau7, sau8, sau9, sau10, sau11, sau12,
+        sau13, sau14, sau15) %>%
+  filter((gear_type == 'bottom trawl') |
+         (gear_type == 'gillnet') |
+         (gear_type == 'otter trawl') |
+         (gear_type == 'shrimp trawl') |
+         (gear_type == 'small scale gillnets') |
+         (gear_type == 'small scale longline') |
+         (gear_type == 'small scale trammel net') |
+         (gear_type == 'trammel nets')) %>%
+  droplevels(.) %>%
+  select(-fishing_entity, -data_layer, -uncertainty_score, -area_type) %>%
+  mutate(area_name = recode(area_name, 'Congo (ex-Zaire)' = 'DR Congo',
+                            `Côte d'Ivoire` = "Cote d'Ivoire",
+                            `Guatemala (Caribbean)` = 'Guatemala',
+                            `Guatemala (Pacific)` = 'Guatemala',
+                            `Howland & Baker Isl. (USA)` = 'USA',
+                            `Jarvis Isl. (USA)` = 'USA',
+                            `Johnston Atoll (USA)` = 'USA',
+                            `Mexico (Atlantic)` = 'Mexico',
+                            `Mexico (Pacific)` = 'Mexico',
+                            `Oman (Musandam)` = 'Oman',
+                            `Palmyra Atoll & Kingman Reef (USA)` = 'USA',
+                            `Panama (Caribbean)` = 'Panama',
+                            `Panama (Pacific)` = 'Panama',
+                            `Saudi Arabia (Persian Gulf)` = 'Saudi Arabia',
+                            `Saudi Arabia (Red Sea)` = 'Saudi Arabia',
+                            `South Africa (Atlantic and Cape)` = 'South Africa',
+                            `South Africa (Indian Ocean Coast)` = 'South Africa',
+                            `Thailand (Andaman Sea)` = 'Thailand',
+                            `Thailand (Gulf of Thailand)` = 'Thailand',
+                            `USA (Alaska, Arctic)` = 'USA',
+                            `USA (Alaska, Subarctic)` = 'USA',
+                            `USA (East Coast)` = 'USA',
+                            `USA (Gulf of Mexico)` = 'USA',
+                            `USA (West Coast)` = 'USA',
+                            `Wake Isl. (USA)` = 'USA',
+                            `Yemen (Arabian Sea)` = 'Yemen',
+                            `Yemen (Red Sea)` = 'Yemen',
+                            `Brazil (mainland)` = 'Brazil',
+                            `Colombia (Caribbean)` = 'Colombia',
+                            `Colombia (Pacific)` = 'Colombia',
+                            `Costa Rica (Caribbean)` = 'Costa Rica',
+                            `Costa Rica (Pacific)` = 'Costa Rica',
+                            `Ecuador (mainland)` = 'Ecuador',
+                            `Egypt (Mediterranean)` = 'Egypt',
+                            `Egypt (Red Sea)` = 'Egypt',
+                            `Honduras (Caribbean)` = 'Honduras',
+                            `Honduras (Pacific)` = 'Honduras',
+                            `Hong Kong (China)` = 'China',
+                            `India (mainland)` = 'India',
+                            `Indonesia (Central)` = 'Indonesia',
+                            `Indonesia (Eastern)` = 'Indonesia',
+                            `Indonesia (Indian Ocean)` = 'Indonesia',
+                            `Iran (Persian Gulf)` = 'Iran',
+                            `Iran (Sea of Oman)` = 'Iran',
+                            `Japan (Daito Islands)` = 'Japan',
+                            `Japan (main islands)` = 'Japan',
+                            `Japan (Ogasawara Islands)` = 'Japan',
+                            `Malaysia (Peninsula East)` = 'Malaysia',
+                            `Malaysia (Peninsula West)` = 'Malaysia',
+                            `Malaysia (Sabah)` = 'Malaysia',
+                            `Malaysia (Sarawak)` = 'Malaysia',
+                            `Morocco (Central)` = 'Morocco',
+                            `Morocco (Mediterranean)` = 'Morocco',
+                            `Morocco (South)` = 'Morocco',
+                            `Nicaragua (Caribbean)` = 'Nicaragua',
+                            `Nicaragua (Pacific)` = 'Nicaragua',
+                            `United Arab Emirates (Fujairah)` = 'United Arab Emirates')) %>%
+  left_join(., iso, by = c('area_name' = 'Country')) %>%
+  group_by(ISO3) %>%
+  summarise(totalGearTonnes = sum(tonnes),
+            totalGearValue = sum(landed_value)) %>%
+  # reverse direction of both tonnes and value and scale values
+  mutate(totalGearTonnes = totalGearTonnes * (-1)) %>%
+  mutate(totalGearValue = totalGearValue * (-1)) %>%
+  mutate_at('totalGearTonnes', funs(scale(.) %>% 
+                                  as.vector)) %>%
+  mutate_at('totalGearValue', funs(scale(.) %>%
+                                 as.vector))
+
+  
 BioInd <- read.csv('BiodiversityIndexData_180513.csv')
 CoastPop <- read.csv('CoastalPopulation_180530.csv')
 CoastLength <- read.csv('CoastLineLength.csv')
@@ -24,13 +133,6 @@ pprod <- read.csv('PProdRaw_181012.csv')
 # Can't merge sst data with this dataset because there's a different
 # value for each country depending on the range of the species in the region
 
-
-# Remove duplicates #
-iso <-
-  iso %>%
-  distinct(ISO, .keep_all = TRUE) %>%
-  mutate(ISO3 = ISO) %>%
-  select(-ISO)
 
 # Clean GIS-derived data and scale all 3 productivity values
 PriProd <-
@@ -182,9 +284,10 @@ Wgi <-
 
 
 # Combine all scores into single df ----------------------------------------------------------------------
-
+# NEED TO ADD FISHING GEAR DATA TO THIS DATASET 
 CountSum <-
   iso %>%
+  left_join(., SauClean, by = c('ISO3' = 'ISO3')) %>%
   left_join(., PriProd, by = c('ISO3' = 'ISO3')) %>%
   left_join(., BioInd, by = c('ISO3' = 'ISO3')) %>%
   select(-X, -Country.y) %>%
@@ -214,7 +317,7 @@ CountSum <-
   mutate(country = Country.x) %>%
   select(-Country.x) %>%
   distinct(ISO3, .keep_all = TRUE) %>%
-  .[, c(40, 1, 2:39)]
+  .[, c(42, 1, 2:41)]
 
 write.csv(CountSum, 'CountryData_180921.csv')
 
@@ -270,7 +373,7 @@ AllCov <-
   distinct(., refid2, .keep_all = TRUE) %>%
   select(-refid2)
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_181012.csv')
+write_csv(AllCov, 'CompleteSpeciesCovariates_181030.csv')
 
 
 # Create generic dataframe that is not species specific --------------------------------
@@ -312,10 +415,6 @@ sstCountryRaw <-
   distinct(., country, .keep_all = TRUE)
 
 
-
-head(sstCountry)
-View(sstCountryRaw)
-
 NoSpp <-
   AllCov %>%
   select(c(1:7)) %>%
@@ -339,7 +438,7 @@ NoSpp <-
   rename(country = country.x) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
-write_csv(NoSpp, 'CountryCovariates_181022.csv')
+write_csv(NoSpp, 'CountryCovariates_181030.csv')
 
 
 
