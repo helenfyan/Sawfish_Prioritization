@@ -31,6 +31,7 @@ sau13 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ13/SAUEEZ13.csv')
 sau14 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ14/SAUEEZ14.csv')
 sau15 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ15/SAUEEZ15.csv')
 
+
 SauClean <-
   rbind(sau1, sau2, sau3, sau4, sau5, sau6, sau7, sau8, sau9, sau10, sau11, sau12,
         sau13, sau14, sau15) %>%
@@ -102,15 +103,17 @@ SauClean <-
                             `Nicaragua (Pacific)` = 'Nicaragua',
                             `United Arab Emirates (Fujairah)` = 'United Arab Emirates')) %>%
   left_join(., iso, by = c('area_name' = 'Country')) %>%
-  group_by(ISO3) %>%
-  summarise(totalGearTonnes = sum(tonnes),
+  dplyr::group_by(ISO3) %>%
+  dplyr::summarise(totalGearTonnes = sum(tonnes),
             totalGearValue = sum(landed_value)) %>%
   # reverse direction of both tonnes and value and scale values
   mutate(totalGearTonnes = totalGearTonnes * (-1)) %>%
   mutate(totalGearValue = totalGearValue * (-1)) %>%
-  mutate_at('totalGearTonnes', funs(scale(.) %>% 
+  mutate(totalGearTonScale = totalGearTonnes) %>%
+  mutate(totalGearValScale = totalGearValue) %>%
+  mutate_at('totalGearTonScale', funs(scale(.) %>% 
                                   as.vector)) %>%
-  mutate_at('totalGearValue', funs(scale(.) %>%
+  mutate_at('totalGearValScale', funs(scale(.) %>%
                                  as.vector))
 
   
@@ -315,11 +318,19 @@ CountSum <-
   select(-X, -Country, -TonnesChond, -TonnesElas) %>%
   left_join(., Wgi, by = c('ISO3' = 'ISO3')) %>%
   mutate(country = Country.x) %>%
+  dplyr::rename(CoastPop = coastal.pop,
+                CoastLength = Lengthkm,
+                EstDis = Discharge,
+                HkExp = ExporttoHK2010,
+                ProteinSup = MeanPro,
+                Iuu = UnreportedPercent,
+                ManImp = impact.percentage,
+                ReefFishers = no_reef_fishers,
+                Saltmarsh = AreaSqKM,
+                ChondLand = TotalTonnes) %>%
   select(-Country.x) %>%
   distinct(ISO3, .keep_all = TRUE) %>%
-  .[, c(42, 1, 2:41)]
-
-write.csv(CountSum, 'CountryData_180921.csv')
+  .[, c(44, 1, 2:43)]
 
 
 # Combine covarites with sawfish occurrence data -----------------------------------------------------------
@@ -329,8 +340,6 @@ SppIso <- read_csv('CompleteSpeciesISO_180924.csv')
 SppCov <-
   SppIso %>%
   left_join(., CountSum, by = c('ISO3' = 'ISO3')) %>%
-  select(-country.y) %>%
-  dplyr::rename(country = country.x) %>%
   mutate(matchid = paste(ISO3, species, sep = '-'))
 
 sst <- read.csv('SSTRaw_181011.csv', na.strings = ' ')
@@ -373,7 +382,7 @@ AllCov <-
   distinct(., refid2, .keep_all = TRUE) %>%
   select(-refid2)
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_181030.csv')
+write_csv(AllCov, 'CompleteSpeciesCovariates_181101.csv')
 
 
 # Create generic dataframe that is not species specific --------------------------------
@@ -438,7 +447,7 @@ NoSpp <-
   rename(country = country.x) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
-write_csv(NoSpp, 'CountryCovariates_181030.csv')
+write_csv(NoSpp, 'CountryCovariates_181101.csv')
 
 
 
