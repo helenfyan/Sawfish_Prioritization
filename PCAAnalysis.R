@@ -8,7 +8,7 @@ library(tidyverse)
 library(devtools)
 library(ggbiplot)
 
-AllDataRaw <- read.csv('CompleteSpeciesCovariates_181101.csv')
+AllDataRaw <- read.csv('CompleteSpeciesCovariates_181106.csv')
 
 AllData <-
   AllDataRaw %>%
@@ -50,7 +50,7 @@ EconPCA
 
 EconPlot <-
   ggbiplot(EconPCA) +
-  scale_x_continuous(limits = c(-4, 3)) +
+  scale_x_continuous(limits = c(-4, 2)) +
   ggtitle('Economic Covariates') +
   theme_classic()
 
@@ -62,10 +62,15 @@ print(EconPlot)
 bio <-
   AllData %>%
   select(ISO3, CoastLengthScale, EstDisScale, ManImpScale, SstMeanScale,
-         SstMaxScale, SstMinScale, PprodMeanScale, PprodMaxScale, PprodMinScale) %>%
+         PprodMeanScale) %>%
+  dplyr::rename(`Coastline Length` = CoastLengthScale,
+                `Estuaries Discharge` = EstDisScale,
+                `Mangrove Change` = ManImpScale,
+                `SST` = SstMeanScale,
+                `Primary Productivity` = PprodMeanScale) %>%
   drop_na()
 
-BioPCA <- prcomp(bio[, c(2:10)], center = FALSE, scale. = FALSE)
+BioPCA <- prcomp(bio[, c(2:6)], center = FALSE, scale. = FALSE)
 
 summary(BioPCA)
 BioPCA
@@ -84,6 +89,9 @@ print(BioPlot)
 gov <- 
   AllData %>%
   select(ISO3, WgiScale, IuuScale, HdiScale) %>%
+  dplyr::rename(`World Governance Index` = WgiScale,
+                `IUU Fishing` = IuuScale,
+                `Human Development Index` = HdiScale) %>%
   drop_na()
 
 GovPCA <- prcomp(gov[, c(2:4)])
