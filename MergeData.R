@@ -35,7 +35,7 @@ sau15 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ15/SAUEEZ15.csv')
 SauClean <-
   rbind(sau1, sau2, sau3, sau4, sau5, sau6, sau7, sau8, sau9, sau10, sau11, sau12,
         sau13, sau14, sau15) %>%
-  filter((gear_type == 'bottom trawl') |
+  dplyr::filter((gear_type == 'bottom trawl') |
          (gear_type == 'gillnet') |
          (gear_type == 'otter trawl') |
          (gear_type == 'shrimp trawl') |
@@ -45,7 +45,7 @@ SauClean <-
          (gear_type == 'trammel nets')) %>%
   droplevels(.) %>%
   select(-fishing_entity, -data_layer, -uncertainty_score, -area_type) %>%
-  mutate(area_name = recode(area_name, 'Congo (ex-Zaire)' = 'DR Congo',
+  mutate(area_name = dplyr::recode(area_name, 'Congo (ex-Zaire)' = 'DR Congo',
                             `Côte d'Ivoire` = "Cote d'Ivoire",
                             `Guatemala (Caribbean)` = 'Guatemala',
                             `Guatemala (Pacific)` = 'Guatemala',
@@ -107,8 +107,9 @@ SauClean <-
   dplyr::summarise(totalGearTonnes = sum(tonnes),
             totalGearValue = sum(landed_value)) %>%
   # reverse direction of both tonnes and value and scale values
-  mutate(totalGearTonnes = totalGearTonnes * (-1)) %>%
-  mutate(totalGearValue = totalGearValue * (-1)) %>%
+  # don't reverse the direction if analyzed separately (no scores)
+  #mutate(totalGearTonnes = totalGearTonnes * (-1)) %>%
+  #mutate(totalGearValue = totalGearValue * (-1)) %>%
   mutate(totalGearTonScale = totalGearTonnes) %>%
   mutate(totalGearValScale = totalGearValue) %>%
   mutate_at('totalGearTonScale', funs(scale(.) %>% 
@@ -161,10 +162,12 @@ BioInd <-
   mutate(ISO3 = ISO) %>%
   select(-ISO)
 
-# Scale and reverse direction of coastal population #
+# Scale and reverse direction of coastal population 
 CoastPop <-
   CoastPop %>%
-  mutate(CoastPopScale = coastal.pop*(-1)) %>%
+  # don't reverse direction 
+  #mutate(CoastPopScale = coastal.pop*(-1)) %>%
+  mutate(CoastPopScale = coastal.pop) %>%
   mutate_at('CoastPopScale', funs(scale(.) %>% 
                                     as.vector)) 
 
@@ -201,7 +204,9 @@ EstDis <-
 HKExp <-
   HKExp %>%
   select(Country, ISO3, ExporttoHK2010) %>%
-  mutate(HkExpScale = ExporttoHK2010*(-1)) %>%
+  # don't reverse direction
+  #mutate(HkExpScale = ExporttoHK2010*(-1)) %>%
+  mutate(HkExpScale = ExporttoHK2010) %>%
   mutate_at('HkExpScale', funs(scale(.) %>%
                                  as.vector))
 
@@ -209,7 +214,9 @@ HKExp <-
 Consumpt <-
   Consumpt %>%
   select(-MeanProScale) %>%
-  mutate(ProteinSupScale = MeanPro*(-1)) %>%
+  # don't reverse direction
+  #mutate(ProteinSupScale = MeanPro*(-1)) %>%
+  mutate(ProteinSupScale = MeanPro) %>%
   mutate_at('ProteinSupScale', funs(scale(.) %>%
                                       as.vector)) %>%
   mutate(country = X) %>%
@@ -230,7 +237,9 @@ GdpHdiOhi <-
 Iuu <-
   Iuu %>%
   select(-UnreportedPercStand) %>%
-  mutate(IuuScale = UnreportedPercent*(-1)) %>%
+  # don't reverse direction
+  # mutate(IuuScale = UnreportedPercent*(-1)) %>%
+  mutate(IuuScale = UnreportedPercent) %>%
   mutate_at('IuuScale', funs(scale(.) %>%
                                as.vector))
 
@@ -253,7 +262,9 @@ ReefFishers <-
   select(-ISO) %>%
   mutate(no_reef_fishers = gsub(',', '', no_reef_fishers)) %>%
   mutate(no_reef_fishers = as.numeric(no_reef_fishers)) %>%
-  mutate(ReefFisherScale = no_reef_fishers*(-1)) %>%
+  # don't reverse direction 
+  #mutate(ReefFisherScale = no_reef_fishers*(-1)) %>%
+  mutate(ReefFisherScale = no_reef_fishers) %>%
   mutate_at('ReefFisherScale', funs(scale(.) %>%
                                       as.vector))
 
@@ -271,7 +282,9 @@ ChondLand <-
   ChondLand %>%
   mutate(ISO3 = ISO) %>%
   select(-ISO, -TonnesScaled) %>%
-  mutate(ChondLandScale = TotalTonnes*(-1)) %>%
+  # don't reverse direction
+  #mutate(ChondLandScale = TotalTonnes*(-1)) %>%
+  mutate(ChondLandScale = TotalTonnes) %>%
   mutate_at('ChondLandScale', funs(scale(.) %>%
                                      as.vector))
 
@@ -287,7 +300,6 @@ Wgi <-
 
 
 # Combine all scores into single df ----------------------------------------------------------------------
-# NEED TO ADD FISHING GEAR DATA TO THIS DATASET 
 CountSum <-
   iso %>%
   left_join(., SauClean, by = c('ISO3' = 'ISO3')) %>%
@@ -375,14 +387,15 @@ sstDat <-
 AllCov <-
   SppCov %>%
   left_join(., sstDat, by = c('matchid' = 'matchid2')) %>%
-  select(-country.y, -matchid, -occurrence.y, -ISO3.y, -species.y) %>%
-  dplyr::rename(country = country.x, ISO3 = ISO3.x, species = species.x, 
+  select(-country.y, -country.x, -matchid, -occurrence.y, -ISO3.y, -species.y) %>%
+  dplyr::rename(ISO3 = ISO3.x, species = species.x, 
          occurrence = occurrence.x) %>%
   mutate(refid2 = paste(ISO3, species, sep = '-')) %>%
   distinct(., refid2, .keep_all = TRUE) %>%
-  select(-refid2)
+  select(-refid2) %>%
+  .[, c(49, 1:48, 50:55)]
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_181101.csv')
+write_csv(AllCov, 'CompleteSpeciesCovariates_181106.csv')
 
 
 # Create generic dataframe that is not species specific --------------------------------
@@ -395,7 +408,7 @@ write_csv(AllCov, 'CompleteSpeciesCovariates_181101.csv')
 sstCountryScaled <-
   sstDat %>%
   select(c(1:4, 7)) %>%
-  filter(occurrence != '2') %>%
+  dplyr::filter(occurrence != '2') %>%
   mutate(geo = paste(country, ISO3, sep = '-')) %>%
   select(-country, -ISO3) %>%
   group_by(geo, occurrence) %>%
@@ -410,7 +423,7 @@ sstCountryScaled <-
 sstCountryRaw <-
   sstDat %>%
   select(c(1:3, 8, 7)) %>%
-  filter(occurrence != '2') %>%
+  dplyr::filter(occurrence != '2') %>%
   mutate(geo = paste(country, ISO3, sep = '-')) %>%
   select(-country, -ISO3) %>%
   group_by(geo, occurrence) %>%
@@ -428,7 +441,7 @@ NoSpp <-
   AllCov %>%
   select(c(1:7)) %>%
   select(-c(1, 3, 7), -region, -presence, -country) %>%
-  filter(occurrence !='2') %>%
+  dplyr::filter(occurrence !='2') %>%
   group_by(ISO3, occurrence) %>%
   summarise(spp = paste(species, collapse = '-'),
             sppres = length(species)) %>%
@@ -447,7 +460,7 @@ NoSpp <-
   rename(country = country.x) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
-write_csv(NoSpp, 'CountryCovariates_181101.csv')
+write_csv(NoSpp, 'CountryCovariates_181106.csv')
 
 
 
