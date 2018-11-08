@@ -8,7 +8,7 @@ library(tidyverse)
 library(devtools)
 library(ggbiplot)
 
-AllDataRaw <- read.csv('CompleteSpeciesCovariates_181106.csv')
+AllDataRaw <- read.csv('CompleteSpeciesCovariates_181108.csv')
 
 AllData <-
   AllDataRaw %>%
@@ -17,7 +17,8 @@ AllData <-
          EpiScale, EstDisScale, HkExpScale, ProteinSupScale, GdpScale, HdiScale, 
          OhiScale, IuuScale, ManImpScale, ReefFisherScale, ChondLandScale, WgiScale,
          SstMeanScale, SstMaxScale, SstMinScale, PprodMeanScale, 
-         PprodMaxScale, PprodMinScale, totalGearTonScale, totalGearValScale) %>%
+         PprodMaxScale, PprodMinScale, totalGearTonScale, totalGearValScale,
+         ManMeanScale) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
 # Can't just drop NAs - need to subset first to keep majority of data
@@ -62,15 +63,16 @@ print(EconPlot)
 bio <-
   AllData %>%
   select(ISO3, CoastLengthScale, EstDisScale, ManImpScale, SstMeanScale,
-         PprodMeanScale) %>%
+         PprodMeanScale, ManMeanScale) %>%
   dplyr::rename(`Coastline Length` = CoastLengthScale,
                 `Estuaries Discharge` = EstDisScale,
                 `Mangrove Change` = ManImpScale,
                 `SST` = SstMeanScale,
-                `Primary Productivity` = PprodMeanScale) %>%
+                `Primary Productivity` = PprodMeanScale,
+                `Mean Mangrove Abundance` = ManMeanScale) %>%
   drop_na()
 
-BioPCA <- prcomp(bio[, c(2:6)], center = FALSE, scale. = FALSE)
+BioPCA <- prcomp(bio[, c(2:7)], center = FALSE, scale. = FALSE)
 
 summary(BioPCA)
 BioPCA
