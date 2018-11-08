@@ -359,7 +359,14 @@ CountSum <-
                 ChondLand = TotalTonnes) %>%
   select(-Country.x) %>%
   distinct(ISO3, .keep_all = TRUE) %>%
-  .[, c(48, 1, 2:47)]
+  .[, c(48, 1, 2:47)] %>%
+  # turn all NAs to 0 for fin exports to HK
+  mutate(HkExp = case_when(is.na(HkExp) ~ 0,
+                           TRUE ~ as.numeric(.$HkExp))) %>%
+  # rescale HkExports
+  mutate(HkExpScale = HkExp) %>%
+  mutate_at('HkExpScale', funs(scale(.) %>%
+                                 as.vector))
 
 
 # Combine covarites with sawfish occurrence data -----------------------------------------------------------
