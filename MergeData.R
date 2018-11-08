@@ -134,6 +134,8 @@ ChondLand <- read.csv('TotalLandings_180512.csv')
 Wgi <- read.csv('WorldGovInd_180515.csv')
 pprod <- read.csv('PProdRaw_181012.csv')
 
+ManNew <- read_csv('Mangrove_Area_ISO_181107.csv')
+
 # Can't merge sst data with this dataset because there's a different
 # value for each country depending on the range of the species in the region
 
@@ -246,13 +248,27 @@ Iuu <-
 # Clean columns, calculate impact, and scale mangrove loss #
 # No need to reverse direction of mangrove loss because it's reflected 
 # in the impact calculation 
-Mangrove <-
+MangroveImp <-
   Mangrove %>%
   mutate(impact.percentage = ((AreaHa00 - AreaHa1980)/AreaHa1980)*100) %>%
   select(Country, ISO3, impact.percentage) %>%
   mutate(ManImpScale = impact.percentage) %>%
   mutate_at('ManImpScale', funs(scale(.) %>%
                                   as.vector))
+
+MangroveNew <-
+  ManNew %>%
+  select(-Rowid, -FID, -FREQUENCY) %>%
+  rename(ISO3 = PARENT_ISO, 
+         ManSum = SUM_GIS_AREA_K,
+         ManMean = MEAN_GIS_AREA_K) %>%
+  mutate(ManSumScale = ManSum) %>%
+  mutate(ManMeanScale = ManMean) %>%
+  mutate_at('ManSumScale', funs(scale(.) %>%
+                                  as.vector)) %>%
+  mutate_at('ManMeanScale', funs(scale(.) %>%
+                                   as.vector))
+
 
 
 # Scale and reverse direction of coral reef fishers #
@@ -321,8 +337,9 @@ CountSum <-
   select(-Country) %>%
   left_join(., Iuu, by = c('ISO3' = 'ISO3')) %>%
   select(-Country, -UnreportedTonnes, -ReportedTonnes, -TotalTonnes) %>%
-  left_join(., Mangrove, by = c('ISO3' = 'ISO3')) %>%
+  left_join(., MangroveImp, by = c('ISO3' = 'ISO3')) %>%
   select(-Country) %>%
+  left_join(., MangroveNew, by = c('ISO3' = 'ISO3')) %>%
   left_join(., ReefFishers, by = c('ISO3' = 'ISO3')) %>%
   select(-country) %>%
   left_join(., Saltmarsh, by = c('ISO3' = 'ISO3')) %>%
@@ -342,7 +359,7 @@ CountSum <-
                 ChondLand = TotalTonnes) %>%
   select(-Country.x) %>%
   distinct(ISO3, .keep_all = TRUE) %>%
-  .[, c(44, 1, 2:43)]
+  .[, c(48, 1, 2:47)]
 
 
 # Combine covarites with sawfish occurrence data -----------------------------------------------------------
@@ -393,9 +410,9 @@ AllCov <-
   mutate(refid2 = paste(ISO3, species, sep = '-')) %>%
   distinct(., refid2, .keep_all = TRUE) %>%
   select(-refid2) %>%
-  .[, c(49, 1:48, 50:55)]
+  .[, c(53, 1:52, 54:59)]
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_181106.csv')
+write_csv(AllCov, 'CompleteSpeciesCovariates_181108.csv')
 
 
 # Create generic dataframe that is not species specific --------------------------------
@@ -460,7 +477,7 @@ NoSpp <-
   rename(country = country.x) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
-write_csv(NoSpp, 'CountryCovariates_181106.csv')
+write_csv(NoSpp, 'CountryCovariates_181108.csv')
 
 
 
