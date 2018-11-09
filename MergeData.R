@@ -255,7 +255,7 @@ sstCountryRaw <-
   sstDat %>%
   select(c(1:3, 5:6)) %>%
   dplyr::filter(occurrence != '2') %>%
-  mutate(geo = paste(country, ISO3, sep = '-')) %>%
+  mutate(geo = paste(country, ISO3, sep = '_')) %>%
   select(-country, -ISO3) %>%
   group_by(geo, occurrence) %>%
   dplyr::summarise(SstCountMean = mean(SstMean), 
@@ -264,7 +264,7 @@ sstCountryRaw <-
   mutate(sppres = case_when(occurrence == '0' ~ 0,
                             TRUE ~ as.numeric(sppres))) %>%
   select(geo, SstCountMean) %>%
-  separate(col = geo, into = c('country', 'ISO3'), sep = '-') %>%
+  separate(col = geo, into = c('country', 'ISO3'), sep = '_') %>%
   distinct(., country, .keep_all = TRUE)
 
 
