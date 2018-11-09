@@ -201,3 +201,162 @@ SauClean <-
                    totalGearValue = sum(landed_value))
 
 write.csv(SauClean, 'SauFishingGear_181109.csv')
+
+
+# clean consumption data ------------------------------------------------
+
+faoRaw <- read_csv('./FAO Consumption/FAOConsumptRaw_180513.csv')
+
+faoClean <-
+  faoRaw %>%
+  select(Country, Element, Item, Year, Unit, Value) %>%
+  filter(Element == 'Protein supply quantity (g/capita/day)') %>%
+  mutate(Country = dplyr::recode(Country, 
+                                 `China, Hong Kong SAR` = 'China',
+                                 `China, Macao SAR` = 'China',
+                                 `China, mainland` = 'China',
+                                 `China, Taiwan Province of` = 'Taiwan',
+                                 `Congo` = 'DR Congo',
+                                 `Iran (Islamic Republic of)` = 'Iran',
+                                 `Venezuela (Bolivarian Republic of)` = 'Venezuela',
+                                 `Democratic People's Republic of Korea` = 'Korea (North)',
+                                 `Antigua and Barbuda` = 'Antigua & Barbuda',
+                                 `Côte d'Ivoire` = "Cote d'Ivoire",
+                                 `Republic of Korea` = 'Korea (South)',
+                        `Saint Vincent and the Grenadines` = 'Saint Vincent & the Grenadines',
+                                 `Timor-Leste` = 'Timor Leste',
+                                 `Trinidad and Tobago` = 'Trinidad & Tobago',
+                                 `United States of America` = 'USA')) %>%
+  group_by(Country) %>%
+  summarise(ProteinDiet = mean(Value)) %>%
+  left_join(., iso, by = c('Country' = 'Country'))
+
+write.csv(faoClean, 'FaoConsumptionClean_181109.csv')
+
+
+# clean IUU data ------------------------------------------------
+
+iuu1 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep1.csv')
+iuu2 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep2.csv')
+iuu3 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep3.csv')
+iuu4 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep4.csv')
+iuu5 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep5.csv')
+iuu6 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep6.csv')
+iuu7 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep7.csv')
+iuu8 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep8.csv')
+iuu9 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep9.csv')
+iuu10 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep10.csv')
+iuu11 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep11.csv')
+iuu12 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep12.csv')
+iuu13 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep13.csv')
+iuu14 <- read_csv('./SAU/SAU IUU Fishing/SAUFishRep14.csv')
+
+
+IuuClean <-
+  rbind(iuu1, iuu2, iuu3, iuu4, iuu5, iuu6, iuu7, iuu8, iuu9, iuu10,
+        iuu11, iuu12, iuu13, iuu14) %>%
+  select(area_name, reporting_status, tonnes) %>%
+  filter(reporting_status == 'Unreported') %>%
+  mutate(area_name = dplyr::recode(area_name, 'Congo (ex-Zaire)' = 'DR Congo',
+                                 `Côte d'Ivoire` = "Cote d'Ivoire",
+                                 `Guatemala (Caribbean)` = 'Guatemala',
+                                 `Guatemala (Pacific)` = 'Guatemala',
+                                 `Howland & Baker Isl. (USA)` = 'USA',
+                                 `Jarvis Isl. (USA)` = 'USA',
+                                 `Johnston Atoll (USA)` = 'USA',
+                                 `Mexico (Atlantic)` = 'Mexico',
+                                 `Mexico (Pacific)` = 'Mexico',
+                                 `Oman (Musandam)` = 'Oman',
+                                 `Palmyra Atoll & Kingman Reef (USA)` = 'USA',
+                                 `Panama (Caribbean)` = 'Panama',
+                                 `Panama (Pacific)` = 'Panama',
+                                 `Saudi Arabia (Persian Gulf)` = 'Saudi Arabia',
+                                 `Saudi Arabia (Red Sea)` = 'Saudi Arabia',
+                                 `South Africa (Atlantic and Cape)` = 'South Africa',
+                                 `South Africa (Indian Ocean Coast)` = 'South Africa',
+                                 `Thailand (Andaman Sea)` = 'Thailand',
+                                 `Thailand (Gulf of Thailand)` = 'Thailand',
+                                 `USA (Alaska, Arctic)` = 'USA',
+                                 `USA (Alaska, Subarctic)` = 'USA',
+                                 `USA (East Coast)` = 'USA',
+                                 `USA (Gulf of Mexico)` = 'USA',
+                                 `USA (West Coast)` = 'USA',
+                                 `Wake Isl. (USA)` = 'USA',
+                                 `Yemen (Arabian Sea)` = 'Yemen',
+                                 `Yemen (Red Sea)` = 'Yemen',
+                                 `Brazil (mainland)` = 'Brazil',
+                                 `Colombia (Caribbean)` = 'Colombia',
+                                 `Colombia (Pacific)` = 'Colombia',
+                                 `Costa Rica (Caribbean)` = 'Costa Rica',
+                                 `Costa Rica (Pacific)` = 'Costa Rica',
+                                 `Ecuador (mainland)` = 'Ecuador',
+                                 `Egypt (Mediterranean)` = 'Egypt',
+                                 `Egypt (Red Sea)` = 'Egypt',
+                                 `Honduras (Caribbean)` = 'Honduras',
+                                 `Honduras (Pacific)` = 'Honduras',
+                                 `Hong Kong (China)` = 'China',
+                                 `India (mainland)` = 'India',
+                                 `Indonesia (Central)` = 'Indonesia',
+                                 `Indonesia (Eastern)` = 'Indonesia',
+                                 `Indonesia (Indian Ocean)` = 'Indonesia',
+                                 `Iran (Persian Gulf)` = 'Iran',
+                                 `Iran (Sea of Oman)` = 'Iran',
+                                 `Japan (Daito Islands)` = 'Japan',
+                                 `Japan (main islands)` = 'Japan',
+                                 `Japan (Ogasawara Islands)` = 'Japan',
+                                 `Malaysia (Peninsula East)` = 'Malaysia',
+                                 `Malaysia (Peninsula West)` = 'Malaysia',
+                                 `Malaysia (Sabah)` = 'Malaysia',
+                                 `Malaysia (Sarawak)` = 'Malaysia',
+                                 `Morocco (Central)` = 'Morocco',
+                                 `Morocco (Mediterranean)` = 'Morocco',
+                                 `Morocco (South)` = 'Morocco',
+                                 `Nicaragua (Caribbean)` = 'Nicaragua',
+                                 `Nicaragua (Pacific)` = 'Nicaragua',
+                                 `United Arab Emirates (Fujairah)` = 'United Arab Emirates',
+                                 `Galapagos Isl. (Ecuador)` = 'Ecuador',
+                                 `Hawaii Main Islands (USA)` = 'USA',
+                                 `Hawaii Northwest Islands (USA)` = 'USA',
+                                 `Prince Edward Isl. (South Africa)` = 'South Africa')) %>% 
+  group_by(area_name) %>%
+  summarise(Iuu = sum(tonnes)) %>%
+  left_join(., iso, by = c('area_name' = 'Country')) %>%
+  drop_na()
+
+write.csv(IuuClean, 'IuuClean_181109.csv')
+
+
+# clean coastal population data ------------------------------------------------
+
+CoastPop <- read_csv('CoastalPopulation_180530.csv')
+
+CoastPopClean <-
+  CoastPop %>%
+  select(Country, coastal.pop) %>%
+  rename(CoastPop = coastal.pop) %>%
+  mutate(Country = dplyr::recode(Country,
+                               `East Timor` = 'Timor Leste',
+                               `Antigua and Barbuda` = 'Antigua & Barbuda',
+                               `Congo, Dem. Rep. of the` = 'DR Congo',
+                               `Congo, Republic of` = 'Congo, R. of',
+                               `Cote D'Ivoire` = "Cote d'Ivoire",
+                               `Korea, Dem. People's Rep. of` = 'Korea (North)',
+                               `Korea, Republic of` = 'Korea (South)',
+                               `Saint Vincent and Grenadines` = 'Saint Vincent & the Grenadines',
+                               `Trinidad and Tobago` = 'Trinidad & Tobago',
+                               `United States of America` = 'USA',
+                               `Solomon Islands` = 'Solomon Isl.')) %>%
+  left_join(., iso, by = c('Country' = 'Country'))
+
+write.csv(CoastPopClean, 'CoastalPopClean_181109.csv')
+  
+
+
+
+
+
+
+
+
+
+
