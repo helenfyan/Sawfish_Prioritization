@@ -8,17 +8,11 @@ library(tidyverse)
 library(devtools)
 library(ggbiplot)
 
-AllDataRaw <- read.csv('CompleteSpeciesCovariates_181108.csv')
+AllDataRaw <- read.csv('CompleteSpeciesCovariates_181109.csv')
 
 AllData <-
   AllDataRaw %>%
-  # Remove saltmarsh data because there are too many NAs
-  select(ISO3, NbiScale, CoastPopScale, CoastLengthScale,
-         EpiScale, EstDisScale, HkExpScale, ProteinSupScale, GdpScale, HdiScale, 
-         OhiScale, IuuScale, ManImpScale, ReefFisherScale, ChondLandScale, WgiScale,
-         SstMeanScale, SstMaxScale, SstMinScale, PprodMeanScale, 
-         PprodMaxScale, PprodMinScale, totalGearTonScale, totalGearValScale,
-         ManMeanScale) %>%
+  select(1:27) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
 # Can't just drop NAs - need to subset first to keep majority of data
@@ -28,82 +22,53 @@ AllData <-
 
 econ <-
   AllData %>%
-  select(ISO3, GdpScale, NbiScale, OhiScale, EpiScale, HkExpScale, ReefFisherScale,
-         CoastPopScale, ChondLandScale, ProteinSupScale, 
-         totalGearTonScale, totalGearValScale) %>%
-  dplyr::rename(GDP = GdpScale,
-                NBI = NbiScale,
-                OHI = OhiScale,
-                EPI = EpiScale,
-                `Fin Exp to HK` = HkExpScale,
-                `Reef Fishers` = ReefFisherScale,
-                `Coastal Population` = CoastPopScale,
-                `Total Chondrichthyes Landings` = ChondLandScale,
-                `Marine Protein Consumption` = ProteinSupScale,
-                `Fishing Gear Landed Tonnes` = totalGearTonScale,
-                `Fishing Gear Landed Value` = totalGearValScale) %>%
-  drop_na()
+  select(ISO3, GDP, NBI, OHI, EPI, HkExp, ReefFishers, CoastPop, 
+         ChondLand, ProteinDiet, totalGearTonnes, totalGearValue) %>%
+  dplyr::rename(`Fin Exp to HK` = HkExp,
+                `Total Chondrichthyes Landings` = ChondLand,
+                `Marine Protein Consumption` = ProteinDiet,
+                `Fishing Gear Landed Tonnes` = totalGearTonnes)
 
-EconPCA <- prcomp(econ[, c(2:12)], center = FALSE, scale. = FALSE)
+EconPCA <- prcomp(econ[, c(2:11)], center = TRUE, scale. = TRUE)
 
-summary(EconPCA)
-EconPCA
-
-EconPlot <-
-  ggbiplot(EconPCA) +
-  scale_x_continuous(limits = c(-4, 2)) +
+ggbiplot(EconPCA) +
   ggtitle('Economic Covariates') +
   theme_classic()
-
-print(EconPlot)
 
 
 # PCA for biological data -------------------------------------------------
 
 bio <-
   AllData %>%
-  select(ISO3, CoastLengthScale, EstDisScale, ManImpScale, SstMeanScale,
-         PprodMeanScale, ManMeanScale) %>%
-  dplyr::rename(`Coastline Length` = CoastLengthScale,
-                `Estuaries Discharge` = EstDisScale,
-                `Mangrove Change` = ManImpScale,
-                `SST` = SstMeanScale,
-                `Primary Productivity` = PprodMeanScale,
-                `Mean Mangrove Abundance` = ManMeanScale) %>%
+  select(2, 10, 13, 15, 22, 24, 27) %>%
+  dplyr::rename(`Coastline Length` = CoastLength,
+                `Estuaries Discharge` = EstDis,
+                `Mangrove Area` = Mang,
+                `SST` = SstMean,
+                `Primary Productivity` = PprodMean) %>%
   drop_na()
 
-BioPCA <- prcomp(bio[, c(2:7)], center = FALSE, scale. = FALSE)
+BioPCA <- prcomp(bio[, c(2:7)], center = TRUE, scale. = TRUE)
 
-summary(BioPCA)
-BioPCA
-
-BioPlot <-
-  ggbiplot(BioPCA) +
-  scale_x_continuous(limits = c(-2, 4)) +
+ggbiplot(BioPCA) +
   ggtitle('Biological Covariates') +
   theme_classic()
-
-print(BioPlot)
 
 
 # PCA for governmental data -------------------------------------------------
 
 gov <- 
   AllData %>%
-  select(ISO3, WgiScale, IuuScale, HdiScale) %>%
-  dplyr::rename(`World Governance Index` = WgiScale,
-                `IUU Fishing` = IuuScale,
-                `Human Development Index` = HdiScale) %>%
-  drop_na()
+  select(2, 26, 21, 19) %>%
+  dplyr::rename(`World Governance Index` = WGI,
+                `IUU Fishing` = Iuu,
+                `Human Development Index` = HDI)
 
-GovPCA <- prcomp(gov[, c(2:4)])
+GovPCA <- prcomp(gov[, c(2:4)], center = TRUE, scale. = TRUE)
 
-summary(GovPCA)
-GovPCA
-
-GovPlot <-
-  ggbiplot(GovPCA) +
+ggbiplot(GovPCA) +
+  expand_limits(x = -3) +
   theme_classic() +
   ggtitle('Goverment Covariates')
 
-print(GovPlot)
+
