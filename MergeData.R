@@ -13,120 +13,16 @@ iso <-
   mutate(ISO3 = ISO) %>%
   select(-ISO)
 
-# Clean and merge all SAU fishing gear data
-
-sau1 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ01/SAUEEZ01.csv')
-sau2 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ02/SAUEEZ02.csv')
-sau3 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ03/SAUEEZ03.csv')
-sau4 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ04/SAUEEZ04.csv')
-sau5 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ05/SAUEEZ05.csv')
-sau6 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ06/SAUEEZ06.csv')
-sau7 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ07/SAUEEZ07.csv')
-sau8 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ08/SAUEEZ08.csv')
-sau9 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ09/SAUEEZ09.csv')
-sau10 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ10/SAUEEZ10.csv')
-sau11 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ11/SAUEEZ11.csv')
-sau12 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ12/SAUEEZ12.csv')
-sau13 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ13/SAUEEZ13.csv')
-sau14 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ14/SAUEEZ14.csv')
-sau15 <- read_csv('SAU/SAU Fishing Gear/SAU EEZ15/SAUEEZ15.csv')
-
-
-SauClean <-
-  rbind(sau1, sau2, sau3, sau4, sau5, sau6, sau7, sau8, sau9, sau10, sau11, sau12,
-        sau13, sau14, sau15) %>%
-  dplyr::filter((gear_type == 'bottom trawl') |
-         (gear_type == 'gillnet') |
-         (gear_type == 'otter trawl') |
-         (gear_type == 'shrimp trawl') |
-         (gear_type == 'small scale gillnets') |
-         (gear_type == 'small scale longline') |
-         (gear_type == 'small scale trammel net') |
-         (gear_type == 'trammel nets')) %>%
-  droplevels(.) %>%
-  select(-fishing_entity, -data_layer, -uncertainty_score, -area_type) %>%
-  mutate(area_name = dplyr::recode(area_name, 'Congo (ex-Zaire)' = 'DR Congo',
-                            `Côte d'Ivoire` = "Cote d'Ivoire",
-                            `Guatemala (Caribbean)` = 'Guatemala',
-                            `Guatemala (Pacific)` = 'Guatemala',
-                            `Howland & Baker Isl. (USA)` = 'USA',
-                            `Jarvis Isl. (USA)` = 'USA',
-                            `Johnston Atoll (USA)` = 'USA',
-                            `Mexico (Atlantic)` = 'Mexico',
-                            `Mexico (Pacific)` = 'Mexico',
-                            `Oman (Musandam)` = 'Oman',
-                            `Palmyra Atoll & Kingman Reef (USA)` = 'USA',
-                            `Panama (Caribbean)` = 'Panama',
-                            `Panama (Pacific)` = 'Panama',
-                            `Saudi Arabia (Persian Gulf)` = 'Saudi Arabia',
-                            `Saudi Arabia (Red Sea)` = 'Saudi Arabia',
-                            `South Africa (Atlantic and Cape)` = 'South Africa',
-                            `South Africa (Indian Ocean Coast)` = 'South Africa',
-                            `Thailand (Andaman Sea)` = 'Thailand',
-                            `Thailand (Gulf of Thailand)` = 'Thailand',
-                            `USA (Alaska, Arctic)` = 'USA',
-                            `USA (Alaska, Subarctic)` = 'USA',
-                            `USA (East Coast)` = 'USA',
-                            `USA (Gulf of Mexico)` = 'USA',
-                            `USA (West Coast)` = 'USA',
-                            `Wake Isl. (USA)` = 'USA',
-                            `Yemen (Arabian Sea)` = 'Yemen',
-                            `Yemen (Red Sea)` = 'Yemen',
-                            `Brazil (mainland)` = 'Brazil',
-                            `Colombia (Caribbean)` = 'Colombia',
-                            `Colombia (Pacific)` = 'Colombia',
-                            `Costa Rica (Caribbean)` = 'Costa Rica',
-                            `Costa Rica (Pacific)` = 'Costa Rica',
-                            `Ecuador (mainland)` = 'Ecuador',
-                            `Egypt (Mediterranean)` = 'Egypt',
-                            `Egypt (Red Sea)` = 'Egypt',
-                            `Honduras (Caribbean)` = 'Honduras',
-                            `Honduras (Pacific)` = 'Honduras',
-                            `Hong Kong (China)` = 'China',
-                            `India (mainland)` = 'India',
-                            `Indonesia (Central)` = 'Indonesia',
-                            `Indonesia (Eastern)` = 'Indonesia',
-                            `Indonesia (Indian Ocean)` = 'Indonesia',
-                            `Iran (Persian Gulf)` = 'Iran',
-                            `Iran (Sea of Oman)` = 'Iran',
-                            `Japan (Daito Islands)` = 'Japan',
-                            `Japan (main islands)` = 'Japan',
-                            `Japan (Ogasawara Islands)` = 'Japan',
-                            `Malaysia (Peninsula East)` = 'Malaysia',
-                            `Malaysia (Peninsula West)` = 'Malaysia',
-                            `Malaysia (Sabah)` = 'Malaysia',
-                            `Malaysia (Sarawak)` = 'Malaysia',
-                            `Morocco (Central)` = 'Morocco',
-                            `Morocco (Mediterranean)` = 'Morocco',
-                            `Morocco (South)` = 'Morocco',
-                            `Nicaragua (Caribbean)` = 'Nicaragua',
-                            `Nicaragua (Pacific)` = 'Nicaragua',
-                            `United Arab Emirates (Fujairah)` = 'United Arab Emirates')) %>%
-  left_join(., iso, by = c('area_name' = 'Country')) %>%
-  dplyr::group_by(ISO3) %>%
-  dplyr::summarise(totalGearTonnes = sum(tonnes),
-            totalGearValue = sum(landed_value)) %>%
-  # reverse direction of both tonnes and value and scale values
-  # don't reverse the direction if analyzed separately (no scores)
-  #mutate(totalGearTonnes = totalGearTonnes * (-1)) %>%
-  #mutate(totalGearValue = totalGearValue * (-1)) %>%
-  mutate(totalGearTonScale = totalGearTonnes) %>%
-  mutate(totalGearValScale = totalGearValue) %>%
-  mutate_at('totalGearTonScale', funs(scale(.) %>% 
-                                  as.vector)) %>%
-  mutate_at('totalGearValScale', funs(scale(.) %>%
-                                 as.vector))
-
-  
+SauClean <- read.csv('SauFishingGear_181109.csv')
 BioInd <- read.csv('BiodiversityIndexData_180513.csv')
-CoastPop <- read.csv('CoastalPopulation_180530.csv')
+CoastPop <- read.csv('CoastalPopClean_181109.csv')
 CoastLength <- read.csv('CoastLineLength.csv')
 EnvPerf<- read.csv('EnvPerfIndexData_180513.csv')
 EstDis <- read.csv('EstuariesDischarge_180516.csv')
 HKExp <- read.csv('exportHK2010_180222.csv')
-Consumpt <- read.csv('FAOConsumptData_180513.csv')
+Consumpt <- read.csv('FaoConsumptionClean_181109.csv')
 GdpHdiOhi <- read.csv('GdpHdiOhi_180515.csv')
-Iuu <- read.csv('IUUFishing_180511.csv')
+Iuu <- read.csv('IuuClean_181109.csv')
 Mangrove <- read.csv('MangroveImpact_180515.csv')
 ReefFishers <- read.csv('ReefFishers.csv')
 Saltmarsh <- read.csv('SaltmarshMeanArea_180316.csv')
@@ -139,6 +35,11 @@ ManNew <- read_csv('Mangrove_Area_ISO_181107.csv')
 # Can't merge sst data with this dataset because there's a different
 # value for each country depending on the range of the species in the region
 
+# Clean SAU fishing gear data
+SauClean <-
+  SauClean %>%
+  select(-X) %>%
+  rename(ISO3 = ISO)
 
 # Clean GIS-derived data and scale all 3 productivity values
 PriProd <-
@@ -169,7 +70,7 @@ CoastPop <-
   CoastPop %>%
   # don't reverse direction 
   #mutate(CoastPopScale = coastal.pop*(-1)) %>%
-  mutate(CoastPopScale = coastal.pop) %>%
+  mutate(CoastPopScale = CoastPop) %>%
   mutate_at('CoastPopScale', funs(scale(.) %>% 
                                     as.vector)) 
 
@@ -215,14 +116,9 @@ HKExp <-
 # Clean columns, scale, and reverse direction of protein supply
 Consumpt <-
   Consumpt %>%
-  select(-MeanProScale) %>%
-  # don't reverse direction
-  #mutate(ProteinSupScale = MeanPro*(-1)) %>%
-  mutate(ProteinSupScale = MeanPro) %>%
-  mutate_at('ProteinSupScale', funs(scale(.) %>%
-                                      as.vector)) %>%
-  mutate(country = X) %>%
-  select(-X)
+  select(-X) %>%
+  rename(country = Country)
+
 
 # Scale GDP, HDI, and OHI #
 GdpHdiOhi <-
@@ -236,14 +132,10 @@ GdpHdiOhi <-
                                                           as.vector))
 
 # Clean columns, scale, and reverse direction of IUU fishing #
+
 Iuu <-
   Iuu %>%
-  select(-UnreportedPercStand) %>%
-  # don't reverse direction
-  # mutate(IuuScale = UnreportedPercent*(-1)) %>%
-  mutate(IuuScale = UnreportedPercent) %>%
-  mutate_at('IuuScale', funs(scale(.) %>%
-                               as.vector))
+  select(-X, -area_name)
 
 # Clean columns, calculate impact, and scale mangrove loss #
 # No need to reverse direction of mangrove loss because it's reflected 
@@ -268,7 +160,6 @@ MangroveNew <-
                                   as.vector)) %>%
   mutate_at('ManMeanScale', funs(scale(.) %>%
                                    as.vector))
-
 
 
 # Scale and reverse direction of coral reef fishers #
@@ -323,7 +214,7 @@ CountSum <-
   left_join(., BioInd, by = c('ISO3' = 'ISO3')) %>%
   select(-X, -Country.y) %>%
   left_join(., CoastPop, by = c('ISO3' = "ISO3")) %>%
-  select(-COUNTRYNAME..unique.entries.only., -Country) %>%
+  select(-X, -Country) %>%
   left_join(., CoastLength, by = c('ISO3' = 'ISO3')) %>%
   select(-Country.Name) %>% 
   left_join(., EnvPerf, by = c('ISO3' = 'ISO3')) %>%
@@ -336,9 +227,8 @@ CountSum <-
   left_join(., GdpHdiOhi, by = c('ISO3' = 'ISO3')) %>%
   select(-Country) %>%
   left_join(., Iuu, by = c('ISO3' = 'ISO3')) %>%
-  select(-Country, -UnreportedTonnes, -ReportedTonnes, -TotalTonnes) %>%
-  left_join(., MangroveImp, by = c('ISO3' = 'ISO3')) %>%
-  select(-Country) %>%
+  #left_join(., MangroveImp, by = c('ISO3' = 'ISO3')) %>%
+  #select(-Country) %>%
   left_join(., MangroveNew, by = c('ISO3' = 'ISO3')) %>%
   left_join(., ReefFishers, by = c('ISO3' = 'ISO3')) %>%
   select(-country) %>%
@@ -347,26 +237,68 @@ CountSum <-
   select(-X, -Country, -TonnesChond, -TonnesElas) %>%
   left_join(., Wgi, by = c('ISO3' = 'ISO3')) %>%
   mutate(country = Country.x) %>%
-  dplyr::rename(CoastPop = coastal.pop,
-                CoastLength = Lengthkm,
+  dplyr::rename(CoastLength = Lengthkm,
                 EstDis = Discharge,
                 HkExp = ExporttoHK2010,
-                ProteinSup = MeanPro,
-                Iuu = UnreportedPercent,
-                ManImp = impact.percentage,
                 ReefFishers = no_reef_fishers,
                 Saltmarsh = AreaSqKM,
                 ChondLand = TotalTonnes) %>%
   select(-Country.x) %>%
   distinct(ISO3, .keep_all = TRUE) %>%
-  .[, c(48, 1, 2:47)] %>%
-  # turn all NAs to 0 for fin exports to HK
+  select(-PprodMax, -PprodMin, -PprodMaxScale, -PprodMinScale)
+  # turn all NAs to 0 for following covariates - need to rescale
   mutate(HkExp = case_when(is.na(HkExp) ~ 0,
                            TRUE ~ as.numeric(.$HkExp))) %>%
-  # rescale HkExports
-  mutate(HkExpScale = HkExp) %>%
-  mutate_at('HkExpScale', funs(scale(.) %>%
-                                 as.vector))
+    mutate(HkExpScale = HkExp) %>%
+    mutate_at('HkExpScale', funs(scale(.) %>%
+                                 as.vector)) %>%
+  select(-ManSum, -ManSumScale) %>%
+  mutate(ManMeanScale = ManMean) %>%
+    mutate_at('ManMeanScale', funs(scale(.) %>%
+                                   as.vector)) %>%
+  mutate(ChondLand = case_when(is.na(ChondLand) ~ 0,
+                               TRUE ~ as.numeric(ChondLand))) %>%
+    mutate(ChondLandScale = ChondLand) %>%
+    mutate_at('ChondLandScale', funs(scale(.) %>%
+                                     as.vector)) %>%
+  mutate(EstDis = case_when(is.na(EstDis) ~ 0,
+                            TRUE ~ as.numeric(EstDis))) %>%
+    mutate(EstDisScale = EstDis) %>%
+    mutate_at('EstDisScale', funs(scale(.) %>%
+                                    as.vector)) %>%
+  mutate(PprodMean = case_when(is.na(PprodMean) ~ 0,
+                               TRUE ~ as.numeric(PprodMean))) %>%
+    mutate(PprodMeanScale = PprodMean) %>%
+    mutate_at('PprodMeanScale', funs(scale(.) %>%
+                                       as.vector)) %>%
+  mutate(ManMean = case_when(is.na(ManMean) ~ 0,
+                             TRUE ~ as.numeric(ManMean))) %>%
+    mutate(ManMeanScale = ManMean) %>%
+    mutate_at('ManMeanScale', funs(scale(.) %>%
+                                     as.vector)) %>%
+  mutate(totalGearTonnes = case_when(is.na(totalGearTonnes) ~ 0,
+                                     TRUE ~ as.numeric(totalGearTonnes))) %>%
+    mutate(totalGearTonScale = totalGearTonnes) %>%
+    mutate_at('totalGearTonScale', funs(scale(.) %>%
+                                          as.vector)) %>%
+  mutate(totalGearValue = case_when(is.na(totalGearValue) ~ 0,
+                                    TRUE ~ as.numeric(totalGearValue))) %>%
+    mutate(totalGearValScale = totalGearValue) %>%
+    mutate_at('totalGearValScale', funs(scale(.) %>%
+                                          as.vector)) %>%
+  mutate(ProteinDiet = case_when(is.na(ProteinDiet) ~ 0,
+                                 TRUE ~ as.numeric(ProteinDiet))) %>%
+    mutate(ProteinDietScale = ProteinDiet) %>%
+    mutate_at('ProteinDietScale', funs(scale(.) %>% 
+                                         as.vector)) %>%
+  mutate(Iuu = case_when(is.na(Iuu) ~ 0,
+                         TRUE ~ as.numeric(Iuu))) %>%
+    mutate(IuuScale = Iuu) %>%
+    mutate_at('IuuScale', funs(scale(.) %>%
+                                 as.vector)) %>%
+  .[, c(36, 1:35, 37:40)]
+
+sapply(CountSum, function(x) sum(is.na(x)))
 
 
 # Combine covarites with sawfish occurrence data -----------------------------------------------------------
@@ -417,9 +349,9 @@ AllCov <-
   mutate(refid2 = paste(ISO3, species, sep = '-')) %>%
   distinct(., refid2, .keep_all = TRUE) %>%
   select(-refid2) %>%
-  .[, c(53, 1:52, 54:59)]
+  .[, c(47, 1:46, 48:53)]
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_181108.csv')
+write_csv(AllCov, 'CompleteSpeciesCovariates_181109.csv')
 
 
 # Create generic dataframe that is not species specific --------------------------------
@@ -436,7 +368,7 @@ sstCountryScaled <-
   mutate(geo = paste(country, ISO3, sep = '-')) %>%
   select(-country, -ISO3) %>%
   group_by(geo, occurrence) %>%
-  summarise(SstCountMeanScale = mean(SstMeanScale), 
+  dplyr::summarise(SstCountMeanScale = mean(SstMeanScale), 
             spp = paste(species, collapse = '-'), 
             sppres = length(species)) %>%
   mutate(sppres = case_when(occurrence == '0' ~ 0,
@@ -451,7 +383,7 @@ sstCountryRaw <-
   mutate(geo = paste(country, ISO3, sep = '-')) %>%
   select(-country, -ISO3) %>%
   group_by(geo, occurrence) %>%
-  summarise(SstCountMean = mean(SstMean), 
+  dplyr::summarise(SstCountMean = mean(SstMean), 
             spp = paste(species, collapse = '-'), 
             sppres = length(species)) %>%
   mutate(sppres = case_when(occurrence == '0' ~ 0,
@@ -467,24 +399,24 @@ NoSpp <-
   select(-c(1, 3, 7), -region, -presence, -country) %>%
   dplyr::filter(occurrence !='2') %>%
   group_by(ISO3, occurrence) %>%
-  summarise(spp = paste(species, collapse = '-'),
+  dplyr::summarise(spp = paste(species, collapse = '-'),
             sppres = length(species)) %>%
   mutate(sppres = case_when(occurrence == '0' ~ 0,
                             TRUE ~ as.numeric(sppres))) %>%
-  rename(species = spp, nospecies = sppres) %>%
+  dplyr::rename(species = spp, nospecies = sppres) %>%
   arrange(desc(nospecies)) %>%
   distinct(., ISO3, .keep_all = TRUE) %>%
   left_join(., sstCountryRaw, by = c('ISO3' = 'ISO3')) %>%
   .[, c(5, 1, 3, 4, 2, 6)] %>%
   left_join(., sstCountryScaled, by = c('ISO3' = 'ISO3')) %>%
   select(-country.y) %>%
-  rename(country = country.x) %>%
+  dplyr::rename(country = country.x) %>%
   left_join(., CountSum, by = c('ISO3' = 'ISO3')) %>%
   select(-country.y) %>%
-  rename(country = country.x) %>%
+  dplyr::rename(country = country.x) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
-write_csv(NoSpp, 'CountryCovariates_181108.csv')
+write_csv(NoSpp, 'CountryCovariates_181109.csv')
 
 
 
