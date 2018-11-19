@@ -2,8 +2,11 @@
 
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets')
 
-library(readxl)
 library(tidyverse)
+
+# Clean occurrence data -------------------------------------------------------------
+
+library(readxl)
 
 sppSheets <- excel_sheets('Sawfish prioritization scores 31 Oct.xlsx')
 
@@ -47,7 +50,7 @@ FormalData <-
 write_csv(FormalData, 'SawfishOccurrence_181015.csv')
 
 
-# Combine species occurrences with ISO data -------------------------------------------------------------------
+# Combine species occurrences with ISO data ---------------------------------------------------------
 
 iso <- read_csv('CountryISO3.csv')
 
@@ -349,14 +352,151 @@ CoastPopClean <-
   left_join(., iso, by = c('Country' = 'Country'))
 
 write.csv(CoastPopClean, 'CoastalPopClean_181109.csv')
-  
 
 
+# FAO Shark fin data ----------------------------------------------------------
+finsRaw <- read.csv('FAOChondExImports_181116.csv')
+
+# change years to numeric
+years <- (1976:2016)
+cols <- names(finsRaw)
+colsYears <- cols[5:45]
+
+fins <-
+  finsRaw %>%
+  rename_at(vars(colsYears), ~ years) %>%
+  rename(country = `Country..Country.`,
+         productRaw = `Commodity..Commodity.`,
+         trade = `Trade.flow..Trade.flow.`) %>%
+  na_if(., '...') %>%
+  na_if(., '-') %>%
+  gather(key = year, value = value, '1976':'2016') %>%
+  drop_na(value) %>%
+  mutate(value = as.numeric(value)) %>%
+  # convert 0 0 to NA to 1
+  mutate(value = case_when(is.na(value) ~ 1, 
+                           value == 0 ~ 1,
+                           TRUE ~ as.numeric(value))) %>%
+  mutate(value = value*1000) %>%
+  dplyr::rename(unit = Unit) %>%
+  mutate(year = as.numeric(year)) %>%
+  # only want exports
+  filter(trade == 'Exports') %>%
+  mutate(product = 
+        case_when(productRaw == 'Shark fins, dried, unsalted' ~ 'fins', 
+                  productRaw == 'Shark fins, dried, whether or not salted, etc.' ~ 'fins',
+                  productRaw == 'Shark fins, fresh or chilled' ~ 'fins',
+                  productRaw == 'Shark fins, frozen' ~ 'fins',
+                  productRaw == 'Shark fins, salted and in brine but not dried or smoked' ~ 'fins',
+                  productRaw == 'Shark fins, prepared or preserved' ~ 'fins',
+                  TRUE ~ 'nonfins')) %>%
+  # add HK to China's total but remove Macao because they have data from the same year 
+  mutate(value = 
+           case_when(country == 'China' & year == 2016 & product == 'fins' ~ 9206000,
+                     TRUE ~ as.numeric(value))) %>%
+  mutate(country = dplyr::recode(country, 
+                                 `China, Hong Kong SAR` = 'Hong Kong',
+                                 `China, Macao SAR` = 'Macao',
+                                 `Congo` = 'R Congo',
+                                 `Congo, Dem. Rep. of the` = 'DR Congo',
+                                 `Cura\xe7ao` = 'Curacao',
+                                 `Iran (Islamic Rep. of)` = 'Iran',
+                                 `Korea, Dem. People's Rep` = 'Korea (North)',
+                                 `Korea, Republic of` = 'Korea (South)',
+                                 `Saint Vincent/Grenadines` = 'Saint Vincent and Grenadines',
+                                 `Taiwan Province of China` = 'Taiwan',
+                                 `Tanzania, United Rep. of` = 'Tanzania',
+                                 `Timor-Leste` = 'Timor Leste',
+                                 `Venezuela, Boliv Rep of` = 'Venezuela')) %>%
+  left_join(., iso, by = c('country' = 'Country')) %>%
+  group_by(country, product) %>%
+  slice(which.max(year)) %>%
+  select(-productRaw, -trade) %>%
+  mutate(unit = 'USD-Exports') %>%
+  .[, c(1, 6, 2:5)]
+
+write.csv(fins, 'ChondExpsClean_181119.csv')  
 
 
+# Clean Chond Landings data ----------------------------------------------------------------
+
+landRaw <- read_csv('FAOChondLand_181116.csv')
+
+land <-
+  landRaw %>%
+  dplyr::rename(country = `Country (Country)`,
+                species = `Species (ASFIS species)`,
+                area = `Fishing area (FAO major fishing area)`,
+                unit = `Unit (Unit)`) %>%
+  gather(key = year, value = value, '1950':'2016') %>%
+  na_if(., '...') %>%
+  na_if(., '-') %>%
+  mutate(value = as.numeric(value)) %>%
+  drop_na(value) %>%
+  mutate(country = dplyr::recode(country,
+                                 # don't inclue HK to China because dates are too different
+                                 `China, Hong Kong SAR` = 'Hong Kong',
+                                 `China, Macao SAR` = 'Macao',
+                                 `Congo` = 'R Congo',
+                                 `Congo, Dem. Rep. of the` = 'DR Congo',
+                                 `Cura\xe7ao` = 'Curacao',
+                                 `Iran (Islamic Rep. of)` = 'Iran',
+                                 `Korea, Dem. People's Rep` = 'Korea (North)',
+                                 `Korea, Republic of` = 'Korea (South)',
+                                 `Saint Vincent/Grenadines` = 'Saint Vincent and Grenadines',
+                                 `Taiwan Province of China` = 'Taiwan',
+                                 `Tanzania, United Rep. of` = 'Tanzania',
+                                 `Timor-Leste` = 'Timor Leste',
+                                 `Venezuela, Boliv Rep of` = 'Venezuela')) %>%
+  # create a total across species for each year for each country
+  group_by(country, year) %>%
+  summarise(total = sum(value)) %>%
+  slice(which.max(year)) %>%
+  mutate(unit = 'tonnes') %>%
+  left_join(., iso, by = c('country' = 'Country')) %>%
+  .[, c(1, 5, 2:4)]
+
+write.csv(land, 'ChondLandClean_181119.csv')
 
 
+# Clean total fishery production data ----------------------------------------
 
+prodRaw <- read_csv('FAOProducts_181116.csv')
 
+prod <-
+  prodRaw %>%
+  dplyr::rename(country = `Country (Country)`,
+                species = `Group of species (Group of species)`,
+                element = `Element (Element)`,
+                unit = `Unit (Unit)`) %>%
+  gather(key = year, value = value, '1961':'2013') %>%
+  na_if(., '...') %>%
+  mutate(value = as.numeric(value)) %>%
+  filter(element == 'Production') %>%
+  mutate(country = dplyr::recode(country,
+                                 # don't inclue HK to China because dates are too different
+                                 `China, Hong Kong SAR` = 'Hong Kong',
+                                 `China, Macao SAR` = 'Macao',
+                                 `Congo` = 'R Congo',
+                                 `Congo, Dem. Rep. of the` = 'DR Congo',
+                                 `Cura\xe7ao` = 'Curacao',
+                                 `Iran (Islamic Rep. of)` = 'Iran',
+                                 `Korea, Dem. People's Rep` = 'Korea (North)',
+                                 `Korea, Republic of` = 'Korea (South)',
+                                 `Saint Vincent/Grenadines` = 'Saint Vincent and Grenadines',
+                                 `Taiwan Province of China` = 'Taiwan',
+                                 `Tanzania, United Rep. of` = 'Tanzania',
+                                 `Timor-Leste` = 'Timor Leste',
+                                 `Venezuela, Boliv Rep of` = 'Venezuela')) %>%
+  drop_na(value) %>%
+  # calculate the sum per year per country
+  group_by(country, year) %>%
+  summarise(total = sum(value)) %>%
+  slice(which.max(year)) %>%
+  # combine china with hong kong because they have data from the same year 
+  mutate(total = case_when(country == 'China' ~ 37560261,
+                           TRUE ~ as.numeric(total))) %>%
+  left_join(., iso, by = c('country' = 'Country')) %>%
+  mutate(unit = 'productionTonnes')
 
-
+write.csv(prod, 'FisheryProductionClean_181119.csv')
