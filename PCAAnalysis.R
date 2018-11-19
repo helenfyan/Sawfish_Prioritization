@@ -8,28 +8,27 @@ library(tidyverse)
 library(devtools)
 library(ggbiplot)
 
-AllDataRaw <- read.csv('CompleteSpeciesCovariates_181109.csv')
+dataRaw <- read_csv('CompleteSpeciesCovariates_181119.csv')
 
-AllData <-
-  AllDataRaw %>%
-  select(1:27) %>%
+allData <-
+  dataRaw %>%
+  select(2, 8:26) %>%
   distinct(., ISO3, .keep_all = TRUE)
 
-# Can't just drop NAs - need to subset first to keep majority of data
-# My data is already scaled and centered therefore do not need to do those in PCA 
 
 # PCA for economic data -------------------------------------------------
 
 econ <-
-  AllData %>%
-  select(ISO3, GDP, NBI, OHI, EPI, HkExp, ReefFishers, CoastPop, 
-         ChondLand, ProteinDiet, totalGearTonnes, totalGearValue) %>%
-  dplyr::rename(`Fin Exp to HK` = HkExp,
+  allData %>%
+  select(ISO3, GDP, NBI, OHI, EPI, FinUSD, ReefFishers, CoastPop, 
+         ChondLand, ProteinDiet, totalGearTonnes, FishProd) %>%
+  dplyr::rename(`Fin Exports` = FinUSD,
                 `Total Chondrichthyes Landings` = ChondLand,
                 `Marine Protein Consumption` = ProteinDiet,
-                `Fishing Gear Landed Tonnes` = totalGearTonnes)
+                `Fishing Gear Landed Tonnes` = totalGearTonnes,
+                `Fishery Production` = FishProd)
 
-EconPCA <- prcomp(econ[, c(2:11)], center = TRUE, scale. = TRUE)
+EconPCA <- prcomp(econ[, c(2:12)], center = TRUE, scale. = TRUE)
 
 ggbiplot(EconPCA) +
   ggtitle('Economic Covariates') +
@@ -39,16 +38,15 @@ ggbiplot(EconPCA) +
 # PCA for biological data -------------------------------------------------
 
 bio <-
-  AllData %>%
-  select(2, 10, 13, 15, 22, 24, 27) %>%
+  allData %>%
+  select(ISO3, SstMean, PprodMean, CoastLength, EstDis, Mang) %>%
   dplyr::rename(`Coastline Length` = CoastLength,
                 `Estuaries Discharge` = EstDis,
                 `Mangrove Area` = Mang,
                 `SST` = SstMean,
-                `Primary Productivity` = PprodMean) %>%
-  drop_na()
+                `Primary Productivity` = PprodMean)
 
-BioPCA <- prcomp(bio[, c(2:7)], center = TRUE, scale. = TRUE)
+BioPCA <- prcomp(bio[, c(2:6)], center = TRUE, scale. = TRUE)
 
 ggbiplot(BioPCA) +
   ggtitle('Biological Covariates') +
@@ -58,8 +56,8 @@ ggbiplot(BioPCA) +
 # PCA for governmental data -------------------------------------------------
 
 gov <- 
-  AllData %>%
-  select(2, 26, 21, 19) %>%
+  allData %>%
+  select(ISO3, WGI, Iuu, HDI) %>%
   dplyr::rename(`World Governance Index` = WGI,
                 `IUU Fishing` = Iuu,
                 `Human Development Index` = HDI)
