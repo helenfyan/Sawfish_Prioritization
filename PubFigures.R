@@ -27,12 +27,13 @@ raw <- read_csv('CompleteSpeciesCovariates_181119.csv')
 
 dat <-
   raw %>%
-  select(ISO3, FinUSDScale, ChondLandScale, FishProdScale,
-         totalGearTonnesScale, PprodMeanScale, CoastPopScale,
-         CoastLengthScale, EstDisScale, ProteinDietScale, GDPScale,
-         IuuScale, MangScale, SstMean, NBI, EPI, HDI, OHI, ReefFishers, WGI) %>%
+  select(2, 8:26) %>%
   distinct(ISO3, .keep_all = TRUE) %>%
-  select(-ISO3)
+  select(-ISO3) %>%
+  # log+1 transform 
+  mutate_at(vars('FinUSD', 'ChondLand', 'FishProd', 'totalGearTonnes', 'PprodMean',
+                 'CoastPop', 'CoastLength', 'EstDis', 'ProteinDiet', 'GDP', 
+                 'Iuu', 'Mang'), log1p)
 
 sapply(dat, function(x) sum(is.na(x)))
 
@@ -63,44 +64,44 @@ lowerTri <- getLowerTri(cormat)
 
 corfig <-
   melt(lowerTri, na.rm = TRUE) %>%
-  mutate(Var2 = dplyr::recode(Var2, 'EstDisScale' = 'Estuaries Discharge (ESD)',
-                              'PprodMeanScale' = 'Primary Productivity (PPD)',
-                              'FinUSDScale' = 'Fin Exports (FXP)',
-                              'CoastPopScale' = 'Coastal Population (CTP)',
-                              'ChondLandScale' = 'Chondrichthyes Landings (CHL)',
+  mutate(Var2 = dplyr::recode(Var2, 'EstDis' = 'Estuaries Discharge (ESD)',
+                              'PprodMean' = 'Primary Productivity (PPD)',
+                              'FinUSD' = 'Fin Exports (FXP)',
+                              'CoastPop' = 'Coastal Population (CTP)',
+                              'ChondLand' = 'Chondrichthyes Landings (CHL)',
                               'SstMean' = 'Sea Surface Temperature (°C; SST)',
-                              'MangScale' = 'Mangrove Area (MNG)',
+                              'Mang' = 'Mangrove Area (MNG)',
                               'HDI' = 'Human Development Index (HDI)',
                               'EPI' = 'Environmental Performance Index (EPI)',
                               'WGI' = 'World Governance Index (WGI)',
                               'OHI' = 'Ocean Health Index (OHI)',
                               'NBI' = 'National Biodiversity Index (NBI)',
-                              'IuuScale' = 'Illegal Unreported and Unregulated Fishing (IUU)',
-                              'GDPScale' = 'Gross Domestic Product (GDP)',
-                              'CoastLengthScale' = 'Coastline length (km; CLL)',
-                              'ProteinDietScale' = 'Marine Protein Supply (MPS)',
-                              'totalGearTonnesScale' = 'Fishing Gear Landed Tonnes (FGT)',
+                              'Iuu' = 'Illegal Unreported and Unregulated Fishing (IUU)',
+                              'GDP' = 'Gross Domestic Product (GDP)',
+                              'CoastLength' = 'Coastline length (km; CLL)',
+                              'ProteinDiet' = 'Marine Protein Supply (MPS)',
+                              'totalGearTonnes' = 'Fishing Gear Landed Tonnes (FGT)',
                               'ReefFishers' = 'Reef Fishers (RFF)',
-                              'FishProdScale' = 'Marine Fisheries Production (MFP)')) %>%
-  mutate(Var1 = dplyr::recode(Var1, 'EstDisScale' = 'ESD',
-                              'PprodMeanScale' = 'PPD',
-                              'FinUSDScale' = 'FXP',
-                              'CoastPopScale' = 'CTP',
-                              'ChondLandScale' = 'CHL',
+                              'FishProd' = 'Marine Fisheries Production (MFP)')) %>%
+  mutate(Var1 = dplyr::recode(Var1, 'EstDis' = 'ESD',
+                              'PprodMean' = 'PPD',
+                              'FinUSD' = 'FXP',
+                              'CoastPop' = 'CTP',
+                              'ChondLand' = 'CHL',
                               'SstMean' = 'SST',
-                              'MangScale' = 'MNG',
+                              'Mang' = 'MNG',
                               'HDI' = 'HDI',
                               'EPI' = 'EPI',
                               'WGI' = 'WGI',
                               'OHI' = 'OHI',
                               'NBI' = 'NBI',
-                              'IuuScale' = 'IUU',
-                              'GDPScale' = 'GDP',
-                              'CoastLengthScale' = 'CLL',
-                              'ProteinDietScale' = 'MPS',
-                              'totalGearTonnesScale' = 'FGT',
+                              'Iuu' = 'IUU',
+                              'GDP' = 'GDP',
+                              'CoastLength' = 'CLL',
+                              'ProteinDiet' = 'MPS',
+                              'totalGearTonnes' = 'FGT',
                               'ReefFishers' = 'RFF',
-                              'FishProdScale' = 'MFP')) %>%
+                              'FishProd' = 'MFP')) %>%
   # reverse the order of x to get plot aligned with axes
   mutate(Var1 = as.factor(Var1)) %>%
   mutate(Var1 = factor(Var1, levels = rev(levels(Var1)))) %>%
