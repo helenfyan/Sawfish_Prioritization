@@ -2,12 +2,10 @@
 # need to find the combination of metrics to minimize the error 
 
 library(tidyverse)
-library(randomForest)
 library(MuMIn)
 library(gbm)
 library(ROCR)
 library(ModelMetrics)
-library(caret)
 
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets')
 
@@ -48,48 +46,68 @@ for(i in unique(sppDatahist$covs)) {
 
 # processing the data -------------------------------------------------
 
-sppProc <-
-  # create dummy variables for species
+sppProc <- 
   rawSpp %>%
   filter(occurrence != '2') %>%
   select(2, 4, 6, 8:26) %>%
-  mutate(refID = paste(ISO3, species, sep = '_')) %>%
+  # create dummy variables for species
+  mutate(refID = paste(ISO3, species, occurrence, sep = '_')) %>%
   select(-ISO3) %>%
   mutate(var = 1) %>%
   spread(species, var, fill = 0, sep = '') %>%
-  select(-refID) %>%
-  .[, c(21:25, 1:20)] %>%
-  # log transform FishProd, PprodMean, CoastPop, CoastLength, GDP, and Iuu
-  mutate_at(vars('FishProd', 'PprodMean', 'CoastPop', 'CoastLength', 'GDP', 'Iuu'), log) %>%
-  dplyr::rename(logFishProd = FishProd,
-                logPprodMean = PprodMean,
-                logCoastPop = CoastPop,
-                logCoastLength = CoastLength,
-                logGDP = GDP,
-                logIuu = Iuu)
+  separate(refID, into = c('ISO3', 'spp', 'occ'), sep = '_') %>%
+  select(-spp, -occ) %>%
+  .[, c(21, 1, 22:26, 2:20)] %>%
+  # divide FinUSD/1000 like FAO raw presents
+  mutate(FinUSD = FinUSD/1000) %>%
+  # log+1 transform the data
+  mutate_at(vars('FinUSD', 'ChondLand', 'FishProd', 'totalGearTonnes', 'PprodMean',
+                 'CoastPop', 'CoastLength', 'EstDis', 'ProteinDiet', 'GDP', 
+                 'Iuu', 'Mang'), log1p) %>%
+  select(-ISO3)
+
+# check normality around these variables ----------------
+
+procHist <-
+  test %>%
+  distinct(., ISO3, .keep_all = TRUE) %>%
+  select(-ISO3, -occurrence, -speciesdwarf, -speciesgreen, -specieslarge, 
+         -speciesnarrow, -speciessmall) %>%
+  gather()
 
 
-# NEED TO FIND GBM MODEL USING THE PROCESSED DATA FRAME   
+for(i in unique(procHist$key)) {
+  
+  print(
+    procHist %>%
+      filter(key == i) %>%
+      ggplot(., aes(value)) +
+      geom_histogram(bins = 30) +
+      labs(x = paste(i), title = paste(i)) +
+      theme_classic()
+  )
+}
+
 # make a training set and a test set ----------------------------------
 set.seed(123)
 
-inTraining <- createDataPartition(sppData$occurrence,
+inTraining <- createDataPartition(sppProc$occurrence,
                                   p = 0.8,
                                   list = FALSE)
 
-trainSpp <- sppData[inTraining, ]
-testSpp <- sppData[-inTraining, ]
+trainSpp <- sppProc[inTraining, ]
+testSpp <- sppProc[-inTraining, ]
 
 
 # using gbm package ----------------------------------------------------
 
 # create hyperparameter grid
 hyperGrid <- expand.grid(
-  shrinkage = c(0.01, 0.02, 0.08),
-  interaction.depth = c(3, 5, 7),
+  shrinkage = c(0.0002, 0.005, 0.01, 0.03, 0.05, 0.08),
+  interaction.depth = c(1, 3, 5, 7),
   n.minobsinnode = c(10, 15, 17),
   # introduce stochastic gradient descent when bag.fraction < 1
-  bag.fraction = c(0.8, 0.9, 0.95),
+  bag.fraction = c(0.5, 0.6, 0.7, 0.8),
   optimal_trees = 0, # a place to dump results
   min_rmse = 0) # a place to dump results
 
@@ -135,12 +153,12 @@ hyperGrid %>%
 gbmFinal <- gbm(formula = occurrence ~ .,
                 distribution = 'bernoulli',
                 data = trainSpp,
-                n.trees = 500,
+                n.trees = 53,
                 cv.folds = 5,
-                interaction.depth = 5,
-                shrinkage = 0.05,
-                n.minobsinnode = 10,
-                bag.fraction = 0.8,
+                interaction.depth = 1,
+                shrinkage = 0.08,
+                n.minobsinnode = 15,
+                bag.fraction = 0.7,
                 train.fraction = 1,
                 n.cores = NULL,
                 verbose = FALSE)
@@ -156,9 +174,23 @@ optTree <- gbm.perf(object = gbmFinal,
 
 pred <- predict.gbm(gbmFinal,
                     newdat = testSpp,
-                    n.trees = optTree)
+                    n.trees = 53,
+                    # this keeps the response bounded between 0 and 1
+                    type = 'response')
 
-auc(actual = testSpp$occurrence, predicted = pred)
+# plot a ROC curve
+predMat <- prediction(pred, testSpp$occurrence)
+perfMat <- performance(predMat, 'tpr', 'fpr')
+
+ROCdf <- data.frame(FalsePositive = perfMat@x.values[[1]],
+                 TruePositive = perfMat@y.values[[1]])
+
+ggplot(ROCdf, aes(x = FalsePositive, y = TruePositive)) +
+  geom_line(size = 1) +
+  labs(title = 'GBM ROC Curve',
+       x = 'False Positive Rate',
+       y = 'True Positive Rate') +
+  theme_classic()
 
 
 # partial dependence plots -------------------------------------------
@@ -169,7 +201,9 @@ coastpdp <-
   gbmFinal %>%
   partial(pred.var = 'CoastLength',
           n.trees = gbmFinal$n.trees,
-          grid.resolution = 100) %>%
+          grid.resolution = 100,
+          # gives the yaxis of the plot on the probably scale 
+          prob = TRUE) %>%
   autoplot(rug = TRUE, train = trainSpp) +
   theme_classic()
 
@@ -200,88 +234,5 @@ gbmFinal %>%
 grid.arrange(ice1, ice2, nrow = 1)
 
 
-
-
-
-gbm1 <- gbm(occurrence ~ .,
-            data = trainSpp,
-            distribution = 'bernoulli',
-            n.trees = 10000,
-            shrinkage = 0.001,
-            cv.folds = 5,
-            interaction.depth = 5,
-            n.minobsinnode = 10)
-
-summary(gbm1)
-
-# get MSE and compute RMSE
-sqrt(min(gbm1$cv.error))
-
-optTree1 <- gbm.perf(object = gbm1,
-                     method = 'cv',
-                     plot.it = TRUE)
-
-pred1 <- predict.gbm(gbm1, 
-                     newdata = testSpp,
-                     n.trees = optTree1)
-
-auc1 <- auc(actual = testSpp$occurrence, predicted = pred1)
-
-
-# using caret ----------------------------------------------------------
-# use tuneGrid to get the optimal hyperparameters to put back into gbm
-library(caret)
-
-sppData2 <-
-  sppData %>%
-  mutate(occurrence = as.factor(ifelse(occurrence == 1, 'present', 'absent')))
-
-set.seed(123)
-fitControl <- trainControl(method = 'repeatedcv',
-                           number = 5,
-                           repeats = 10,
-                           classProbs = TRUE,
-                           summaryFunction = twoClassSummary)
-
-inTraining2 <- createDataPartition(sppData2$occurrence,
-                                   p = 0.8,
-                                   list = FALSE)
-
-trainSpp2 <- sppData2[inTraining2, ]
-testSpp2 <- sppData2[-inTraining2, ]
-
-gbmGrid <- expand.grid(interaction.depth = c(1, 5, 9),
-                       n.trees = (1:200)*50,
-                       shrinkage = c(0.1, 0.001),
-                       n.minobsinnode = 10)
-
-gbm2 <- train(occurrence ~ .,
-              data = trainSpp2,
-              method = 'gbm',
-              trControl = fitControl,
-              verbose = FALSE,
-              tuneGrid = gbmGrid,
-              metric = 'ROC')
-
-print(gbm2)
-
-# plot resampling profile
-ggplot(gbm2)
-
-best1 <- best(gbm2$results,
-              metric = 'ROC',
-              maximize = TRUE)
-
-gbm2$results[best1, 1:7]
-
-
-
-
-
-
-
-
-
-
-
+# write a loop to print a partial dependence plot for all variables -------------------
 
