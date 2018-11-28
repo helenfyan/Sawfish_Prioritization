@@ -19,26 +19,52 @@ CoastPop <- read.csv('CoastalPopClean_181109.csv')
 CoastLength <- read.csv('CoastLineLength.csv')
 EnvPerf<- read.csv('EnvPerfIndexData_180513.csv')
 EstDis <- read.csv('EstuariesDischarge_180516.csv')
-HKExp <- read.csv('exportHK2010_180222.csv')
+#HKExp <- read.csv('exportHK2010_180222.csv')
+Exports <- read_csv('ChondExpsClean_181119.csv')
 Consumpt <- read.csv('FaoConsumptionClean_181109.csv')
 GdpHdiOhi <- read.csv('GdpHdiOhi_180515.csv')
 Iuu <- read.csv('IuuClean_181109.csv')
 Mangrove <- read.csv('MangroveImpact_180515.csv')
 ReefFishers <- read.csv('ReefFishers.csv')
 Saltmarsh <- read.csv('SaltmarshMeanArea_180316.csv')
-ChondLand <- read.csv('TotalLandings_180512.csv')
+#ChondLand <- read.csv('TotalLandings_180512.csv')
+Landings <- read_csv('ChondLandClean_181119.csv')
 Wgi <- read.csv('WorldGovInd_180515.csv')
 pprod <- read.csv('PProdRaw_181012.csv')
 ManNew <- read_csv('Mangrove_Area_ISO_181107.csv')
+Fishery <- read_csv('FisheryProductionClean_181119.csv')
 
 # Can't merge sst data with this dataset because there's a different
 # value for each country depending on the range of the species in the region
 
+# Clean fin export data
+FinExp <-
+  Exports %>%
+  select(-X1, -year, -unit, -country) %>%
+  filter(product == 'fins') %>%
+  dplyr::rename(FinUSD = value,
+                ISO3 = ISO) %>%
+  select(-product) 
+
+# Clean chond landings data
+Land <-
+  Landings %>%
+  select(-X1, -year, -unit, -country) %>%
+  dplyr::rename(ChondLand = total,
+                ISO3 = ISO)
+
+# Clean fishery landings data
+Fish <-
+  Fishery %>%
+  select(-X1, -year, -unit, -country) %>%
+  dplyr::rename(FishProd = total,
+         ISO3 = ISO)
+
 # Clean SAU fishing gear data
 SauClean <-
   SauClean %>%
-  select(-X) %>%
-  rename(ISO3 = ISO)
+  select(-X, -totalGearValue) %>%
+  dplyr::rename(ISO3 = ISO)
 
 # Clean GIS-derived data 
 PriProd <-
@@ -60,25 +86,25 @@ CoastPop <-
 CoastLength <-
   CoastLength %>%
   select(ISO3, Lengthkm) %>%
-  rename(CoastLength = Lengthkm)
+  dplyr::rename(CoastLength = Lengthkm)
 
 # Clean EPI
 EnvPerf <-
   EnvPerf %>%
   select(ISO, EPI) %>%
-  rename(ISO3 = ISO)
+  dplyr::rename(ISO3 = ISO)
 
 # Clean estuaries discharge 
 EstDis <-
   EstDis %>%
   select(-DischargeScale) %>%
-  rename(ISO3 = X, EstDis = Discharge)
+  dplyr::rename(ISO3 = X, EstDis = Discharge)
 
 # Clean fin exports to HK 
-HKExp <-
-  HKExp %>%
-  select(ISO3, ExporttoHK2010t) %>%
-  rename(HkExp = ExporttoHK2010t)
+#HKExp <-
+#  HKExp %>%
+#  select(ISO3, ExporttoHK2010t) %>%
+#  rename(HkExp = ExporttoHK2010t)
 
 # Clean protein diet
 Consumpt <-
@@ -90,7 +116,7 @@ GdpHdiOhi <-
   GdpHdiOhi %>%
   select(-Country)
 
-# Clean =IUU fishing 
+# Clean IUU fishing 
 
 Iuu <-
   Iuu %>%
@@ -110,37 +136,39 @@ Iuu <-
 ManNew <-
   ManNew %>%
   select(PARENT_ISO, MEAN_GIS_AREA_K) %>%
-  rename(ISO3 = PARENT_ISO, Mang = MEAN_GIS_AREA_K)
+  dplyr::rename(ISO3 = PARENT_ISO, Mang = MEAN_GIS_AREA_K)
 
 # Clean coral reef fishers
 ReefFishers <-
   ReefFishers %>%
   select(ISO, no_reef_fishers) %>%
-  rename(ISO3 = ISO, ReefFishers = no_reef_fishers) %>%
+  dplyr::rename(ISO3 = ISO, ReefFishers = no_reef_fishers) %>%
   .[1:98, ] %>%
   mutate(ReefFishers = as.numeric(ReefFishers))
 
 # Clean saltmarsh area 
 Saltmarsh <-
   Saltmarsh %>%
-  rename(ISO3 = ISO, Saltmarsh = AreaSqKM)
+  dplyr::rename(ISO3 = ISO, Saltmarsh = AreaSqKM)
 
 # Clean chond landings
-ChondLand <-
-  ChondLand %>%
-  select(ISO, TotalTonnes) %>%
-  rename(ISO3 = ISO, ChondLand = TotalTonnes)
+#ChondLand <-
+#  ChondLand %>%
+#  select(ISO, TotalTonnes) %>%
+#  rename(ISO3 = ISO, ChondLand = TotalTonnes)
 
 # Clean world governance index 
 Wgi <-
   Wgi %>%
-  rename(ISO3 = X)
-
+  dplyr::rename(ISO3 = X)
 
 
 # Combine all scores into single df ----------------------------------------------------------------------
 CountSum <-
   iso %>%
+  left_join(., FinExp, by = c('ISO3' = 'ISO3')) %>%
+  left_join(., Land, by = c('ISO3' = 'ISO3')) %>%
+  left_join(., Fish, by = c('ISO3' = 'ISO3')) %>%
   left_join(., SauClean, by = c('ISO3' = 'ISO3')) %>%
   left_join(., PriProd, by = c('ISO3' = 'ISO3')) %>%
   left_join(., BioInd, by = c('ISO3' = 'ISO')) %>%
@@ -148,37 +176,36 @@ CountSum <-
   left_join(., CoastLength, by = c('ISO3' = 'ISO3')) %>%
   left_join(., EnvPerf, by = c('ISO3' = 'ISO3')) %>%
   left_join(., EstDis, by = c('ISO3' = 'ISO3')) %>%
-  left_join(., HKExp, by = c('ISO3' = 'ISO3')) %>%
+  #left_join(., HKExp, by = c('ISO3' = 'ISO3')) %>%
   left_join(., Consumpt, by = c('ISO3' = 'ISO3')) %>%
   left_join(., GdpHdiOhi, by = c('ISO3' = 'ISO')) %>%
   left_join(., Iuu, by = c('ISO3' = 'ISO3')) %>%
   left_join(., ManNew, by = c('ISO3' = 'ISO3')) %>%
   left_join(., ReefFishers, by = c('ISO3' = 'ISO3')) %>%
-  mutate(ReefFishers = as.numeric(ReefFishers)) %>%
-  left_join(., Saltmarsh, by = c('ISO3' = 'ISO3')) %>%
-  left_join(., ChondLand, by = c('ISO3' = 'ISO3')) %>%
+  # remove saltmarsh because too many zeros
+  #left_join(., Saltmarsh, by = c('ISO3' = 'ISO3')) %>%
+  #left_join(., ChondLand, by = c('ISO3' = 'ISO3')) %>%
   left_join(., Wgi, by = c('ISO3' = 'ISO3')) %>%
   distinct(ISO3, .keep_all = TRUE) %>%
   replace(., is.na(.), 0)
 
-sapply(CountSum, function(x) sum(is.na(x)))
-
 allcols <- names(CountSum)
-cols <- allcols[3:21]
+cols <- allcols[3:20]
 colsScaled <- paste(cols, 'Scale', sep = '')
 
 CountSumScale <-
   CountSum %>%
   rename_at(vars(cols), ~ colsScaled) %>%
-  mutate_at(3:21, funs(scale(.))) 
+  mutate_at(3:20, funs(scale(.))) 
 
 
 CountSumAll <-
   CountSum %>%
   left_join(., CountSumScale, by = c('ISO3' = 'ISO3')) %>%
   select(-Country.y) %>%
-  rename(country = Country.x)
+  dplyr::rename(country = Country.x)
 
+sapply(CountSumAll, function(x) sum(is.na(x)))
 
 
 # Combine covarites with sawfish occurrence data -----------------------------------------------------------
@@ -224,9 +251,14 @@ AllCov <-
   mutate(refid2 = paste(ISO3, species, sep = '-')) %>%
   distinct(., refid2, .keep_all = TRUE) %>%
   select(-refid2) %>%
-  .[, c(45, 1:25, 47, 26:44, 46)]
+  .[, c(43, 1:6, 45, 7:24, 44, 25:42)] %>%
+  filter(ISO3 != 'LAO') %>%
+  mutate(country = case_when(ISO3 == 'TLS' ~ 'Timor Leste',
+                             TRUE ~ as.character(country)))
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_181109.csv')
+sapply(AllCov, function(x) sum(is.na(x)))
+
+write_csv(AllCov, 'CompleteSpeciesCovariates_181119.csv')
 
 
 # Create generic dataframe that is not species specific --------------------------------
@@ -294,15 +326,90 @@ NoSpp <-
   distinct(., ISO3, .keep_all = TRUE) %>%
   .[, c(1:6, 8:26, 7, 27:45)]
 
+sapply(NoSpp, function(x) sum(is.na(x)))
+
 write_csv(NoSpp, 'CountryCovariates_181109.csv')
 
 
+# Tranformations ------------------------------------------------------------------
+
+# make histograms to assess which variables to transform
+sppDatahist <-
+  AllCov %>%
+  select(2, 8:26) %>%
+  distinct(., ISO3, .keep_all = TRUE) %>%
+  select(-ISO3) %>%
+  gather(key = covs)
 
 
+for(i in unique(sppDatahist$covs)) {
+  
+  print(
+    sppDatahist %>%
+      filter(covs == i) %>%
+      ggplot(., aes(value)) +
+      geom_histogram(bins = 30) +
+      labs(title = paste(i), x = paste(i)) +
+      theme_classic()
+  )
+}
+
+# processing the data -------------------------------------------------
+
+sppProc <- 
+  AllCov %>%
+  filter(occurrence != '2') %>%
+  select(2, 4, 6, 8:26) %>%
+  # create dummy variables for species
+  mutate(refID = paste(ISO3, species, occurrence, sep = '_')) %>%
+  select(-ISO3) %>%
+  mutate(var = 1) %>%
+  spread(species, var, fill = 0, sep = '') %>%
+  separate(refID, into = c('ISO3', 'spp', 'occ'), sep = '_') %>%
+  select(-spp, -occ) %>%
+  .[, c(21, 1, 22:26, 2:20)] %>%
+  # divide FinUSD/1000 like FAO raw presents
+  mutate(FinUSD = FinUSD/1000) %>%
+  # log+1 transform the data
+  mutate_at(vars('FinUSD', 'ChondLand', 'FishProd', 'totalGearTonnes', 'PprodMean',
+                 'CoastPop', 'CoastLength', 'EstDis', 'ProteinDiet', 'GDP', 
+                 'Iuu', 'Mang'), log1p) %>%
+  dplyr::rename('logFinUSD' = 'FinUSD',
+                'logChondLand' = 'ChondLand',
+                'logFishProd' = 'FishProd',
+                'logtotalGearTonnes' = 'totalGearTonnes',
+                'logPprodMean' = 'PprodMean',
+                'logCoastPop' = 'CoastPop',
+                'logCoastLength' = 'CoastLength', 
+                'logEstDis' = 'EstDis', 
+                'logProteinDiet' = 'ProteinDiet', 
+                'logGDP' = 'GDP', 
+                'logIuu' = 'Iuu', 
+                'logMang' = 'Mang')
+
+write.csv(sppProc, 'ProcessedCovariates_181128.csv')
 
 
+# check normality around these variables ----------------
+# don't need to run this every time 
+
+procHist <-
+  sppProc %>%
+  distinct(., ISO3, .keep_all = TRUE) %>%
+  select(-ISO3, -occurrence, -speciesdwarf, -speciesgreen, -specieslarge, 
+         -speciesnarrow, -speciessmall) %>%
+  gather()
 
 
-
-
+for(i in unique(procHist$key)) {
+  
+  print(
+    procHist %>%
+      filter(key == i) %>%
+      ggplot(., aes(value)) +
+      geom_histogram(bins = 30) +
+      labs(x = paste(i), title = paste(i)) +
+      theme_classic()
+  )
+}
 
