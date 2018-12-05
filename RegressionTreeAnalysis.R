@@ -19,6 +19,8 @@ rawSpp <- read_csv('ProcessedCovariates_181128.csv')
 fishprod <- cor.test(rawSpp$logCoastPop, rawSpp$logFishProd, method = 'pearson')
 iuu <- cor.test(rawSpp$logIuu, rawSpp$logtotalGearTonnes, method = 'pearson')
 
+
+
 # regression tree analysis ---------------------------------
 
 sppData <-
@@ -191,6 +193,155 @@ pdpdf <-
   })
 
 hditest <- bind_rows(merp[[1]])
+
+testdf <- sppData %>% dplyr::select(occurrence, logCoastPop, logFinUSD, SstMean)
+
+testlist <- list()
+prog <- 1
+fin <- 9
+bar <- txtProgressBar(min = 0, max = fin, style = 3)
+
+merp <- lapply(1:3, function(x) {
+  for(i in names(testdf)) {
+    
+    setTxtProgressBar(bar, value = prog)
+    prog <- prog + 1
+    if(prog == fin) {print('done!')}
+    
+    randomI <- sample(1:nrow(testdf), nrow(testdf))
+    randomtest <- testdf[randomI, ]
+    
+    # train a gbm model
+    testgbm <- gbm(formula = occurrence ~ .,
+                   distribution = 'bernoulli',
+                   data = randomtest,
+                   n.trees = 3000,
+                   interaction.depth = 10,
+                   shrinkage = 0.001,
+                   bag.fraction = 0.5,
+                   cv.folds = 10,
+                   n.cores = NULL,
+                   verbose = FALSE)
+    
+    # create dataframes of pdp values predicted by gbm
+    dftest <- 
+      testgbm %>% 
+      pdp::partial(pred.var = paste(i),
+                   grid.resolution = 102,
+                   n.trees = testgbm$n.trees,
+                   prob = TRUE)
+    
+    dftest$run <- x
+    testlist[[x]] <- dftest
+  }
+  return(testlist)
+})
+
+testlist <- list()
+prog <- 1
+fin <- 3
+bar <- txtProgressBar(min = 0, max = fin, style = 3)
+
+for(i in 1:3) {
+  
+  setTxtProgressBar(bar, value = prog)
+  prog <- prog + 1
+  if(prog == fin) {print('done!')}
+  
+  for(j in names(testdf)[2:4]) {
+    
+    randomI <- sample(1:nrow(testdf), nrow(testdf))
+    randomtest <- testdf[randomI, ]
+    
+    # train a gbm model
+    testgbm <- gbm(formula = occurrence ~ .,
+                   distribution = 'bernoulli',
+                   data = randomtest,
+                   n.trees = 3000,
+                   interaction.depth = 10,
+                   shrinkage = 0.001,
+                   bag.fraction = 0.5,
+                   cv.folds = 10,
+                   n.cores = NULL,
+                   verbose = FALSE)
+    
+    # create dataframes of pdp values predicted by gbm
+    dftest <- 
+      testgbm %>% 
+      pdp::partial(pred.var = paste(j),
+                   grid.resolution = 102,
+                   n.trees = testgbm$n.trees,
+                   prob = TRUE)
+    
+    dftest$run <- i
+    testlist[[j]] <- dftest
+  }
+  return(testlist)
+}
+
+
+prog <- 1
+niters <- 1e6
+endend <- 3
+bar <- txtProgressBar(min = 0, max = endend, style = 3)
+for(i in 1:niters) {
+  setTxtProgressBar(bar, value = prog)
+  prog <- prog + 1
+  if(prog == niters){print('done!')}
+}
+
+pbar <- lapply(seq(1:endend), function(x) {
+  for(i in 1:niters){
+    setTxtProgressBar(bar, value = prog)
+    prog <- prog + 1
+    setTxtProgressBar(bar, x)
+  }
+})
+
+
+
+testlist <- list()
+prog <- 1
+#fin <- 9
+bootend <- 3
+bar <- txtProgressBar(min = 0, max = bootend, style = 3)
+
+testfun <- lapply(seq(1:bootend), function(x) {
+  for(i in names(testdf)[2:4]) {
+    
+    #setTxtProgressBar(bar, value = prog)
+    #prog = prog + 1
+    
+    randomI <- sample(1:nrow(testdf), nrow(testdf))
+    randomtest <- testdf[randomI, ]
+    
+    # train a gbm model
+    testgbm <- gbm(formula = occurrence ~ .,
+                   distribution = 'bernoulli',
+                   data = randomtest,
+                   n.trees = 3000,
+                   interaction.depth = 10,
+                   shrinkage = 0.001,
+                   bag.fraction = 0.5,
+                   cv.folds = 10,
+                   n.cores = NULL,
+                   verbose = FALSE)
+    
+    # create dataframes of pdp values predicted by gbm
+    dftest <- 
+      testgbm %>% 
+      pdp::partial(pred.var = paste(i),
+                   grid.resolution = 102,
+                   n.trees = testgbm$n.trees,
+                   prob = TRUE)
+    
+    dftest$run <- x
+    testlist[[i]] <- dftest
+    
+    setTxtProgressBar(bar, x)
+  }
+  return(testlist)
+})
 
 
 pdpresults <- 
