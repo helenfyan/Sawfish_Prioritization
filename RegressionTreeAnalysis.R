@@ -20,7 +20,6 @@ fishprod <- cor.test(rawSpp$logCoastPop, rawSpp$logFishProd, method = 'pearson')
 iuu <- cor.test(rawSpp$logIuu, rawSpp$logtotalGearTonnes, method = 'pearson')
 
 
-
 # regression tree analysis ---------------------------------
 
 sppData <-
@@ -99,6 +98,31 @@ auc1 <- auc(actual = sppTest$occurrence, predicted = testpred)
 
 print(auc1)
 
+# make pdp plots ----------------------------------------
+
+pdpplots <- 
+  lapply(names(sppTrain[2:23]), function(x) {
+    
+    pdf(paste('initGBMout', x, '.pdf', sep = ''))
+    
+    dfplot <- 
+      test %>% 
+      pdp::partial(pred.var = paste(x),
+                   grid.resolution = 102,
+                   n.trees = test$n.trees,
+                   prob = TRUE) %>% 
+      autoplot(rug = TRUE, train = sppData)
+      theme_classic()
+    
+    print(dfplot)
+    
+    dev.off()
+    
+  })
+
+
+
+
 # evaluate model performance and obtain performance values 
 
 cvresults <- expand.grid(run = seq(1:1000),
@@ -154,194 +178,132 @@ for(i in 1:1000) {
 
 write.csv(cvresults, 'BRTBootstrapResults_181203.csv')
 
-# make all partial dependence plots 
 
+# make all partial dependence plots ---------------------------------------------
 
 
 total <- list()
-pdpdf <- 
-  lapply(names(sppTrain)[2:23], function(x) {
+bootend <- 1000
+progbar <- txtProgressBar(min = 0, max = bootend, style = 3)
+
+pdpdf <- lapply(seq(1:bootend), function(x) {
+  
+  for(i in names(sppTrain)[2:23]) {
+    
+    randomI <- sample(1:nrow(sppTrain), nrow(sppTrain))
+    randomtest <- sppTrain[randomI, ]
+    
+    # train a gbm model
+    pdpgbm <- gbm(formula = occurrence ~ .,
+                   distribution = 'bernoulli',
+                   data = randomtest,
+                   n.trees = 3000,
+                   interaction.depth = 10,
+                   shrinkage = 0.001,
+                   bag.fraction = 0.5,
+                   cv.folds = 10,
+                   n.cores = NULL,
+                   verbose = FALSE)
+    
+    # create dataframes of pdp values predicted by gbm
+    df <- 
+      pdpgbm %>% 
+      pdp::partial(pred.var = paste(i),
+                   grid.resolution = 102,
+                   n.trees = pdpgbm$n.trees,
+                   prob = TRUE)
+    
+    df$run <- x
+    total[[i]] <- df
+    
+    setTxtProgressBar(progbar, x)
+    
+  }
+  return(total)
+})
+
+# write a loop to rbind each dataframe together
+
+totaldf <- data.frame()
+alldf <- 
+  lapply(seq(1:22), function(x) {
     for(i in 1:1000) {
       
-      # randomize the data everytime
-      randomI <- sample(1:nrow(sppTrain), nrow(sppTrain))
-      randomSpp <- sppTrain[randomI, ]
-      
-      # train a gbm model
-      pdpgbm <- gbm(formula = occurrence ~ .,
-                    distribution = 'bernoulli',
-                    data = randomSpp,
-                    n.trees = 3000,
-                    interaction.depth = 10,
-                    shrinkage = 0.001,
-                    bag.fraction = 0.5,
-                    cv.folds = 10,
-                    n.cores = NULL,
-                    verbose = FALSE)
-      
-      # create a dataframe of pdp values predicted by pdpgbm
-      df <- 
-        pdpgbm %>% 
-        pdp::partial(pred.var = paste(x),
-                     grid.resolution = 102,
-                     n.trees = pdpgbm$n.trees,
-                     prob = TRUE)
-      df$run <- i
-      total[[i]] <- df
+      singledf <- data.frame(pdpdf[[i]][[x]])
+      totaldf <- rbind(totaldf, singledf)
+  
     }
-    return(total)
+    return(totaldf)
   })
 
-hditest <- bind_rows(merp[[1]])
 
-testdf <- sppData %>% dplyr::select(occurrence, logCoastPop, logFinUSD, SstMean)
+# turn each df into its own csv for saving
 
-testlist <- list()
-prog <- 1
-fin <- 9
-bar <- txtProgressBar(min = 0, max = fin, style = 3)
+cols <- names(sppTrain)
+vars <- cols[2:23]
+dfvars <- paste0('GBMResults', vars, '_181211', sep = '')
+spreaddf <- list()
 
-merp <- lapply(1:3, function(x) {
-  for(i in names(testdf)) {
-    
-    setTxtProgressBar(bar, value = prog)
-    prog <- prog + 1
-    if(prog == fin) {print('done!')}
-    
-    randomI <- sample(1:nrow(testdf), nrow(testdf))
-    randomtest <- testdf[randomI, ]
-    
-    # train a gbm model
-    testgbm <- gbm(formula = occurrence ~ .,
-                   distribution = 'bernoulli',
-                   data = randomtest,
-                   n.trees = 3000,
-                   interaction.depth = 10,
-                   shrinkage = 0.001,
-                   bag.fraction = 0.5,
-                   cv.folds = 10,
-                   n.cores = NULL,
-                   verbose = FALSE)
-    
-    # create dataframes of pdp values predicted by gbm
-    dftest <- 
-      testgbm %>% 
-      pdp::partial(pred.var = paste(i),
-                   grid.resolution = 102,
-                   n.trees = testgbm$n.trees,
-                   prob = TRUE)
-    
-    dftest$run <- x
-    testlist[[x]] <- dftest
-  }
-  return(testlist)
-})
-
-testlist <- list()
-prog <- 1
-fin <- 3
-bar <- txtProgressBar(min = 0, max = fin, style = 3)
-
-for(i in 1:3) {
+for(i in 1:22) {
   
-  setTxtProgressBar(bar, value = prog)
-  prog <- prog + 1
-  if(prog == fin) {print('done!')}
+  spreaddf[[i]] <- 
+    alldf[[i]] %>% 
+    mutate(id = rep(1:102, length.out = n())) %>% 
+    mutate(refid = paste(.[[1]], id, sep = '_')) %>% 
+    group_by(refid) %>% 
+    summarise(totalmean = mean(yhat),
+              totalsd = sd(yhat),
+              totaln = n(),
+              totalse = totalsd/sqrt(totaln),
+              totalmax = max(yhat),
+              totalmin = min(yhat),
+              lowerci = totalmean - qt(1 - (0.1/2), totaln - 1) * totalse,
+              upperci = totalmean + qt(1 - (0.1/2), totaln - 1) * totalse) %>% 
+    separate(refid, into = c(paste(vars[i]), 'id'), sep = '_') 
   
-  for(j in names(testdf)[2:4]) {
-    
-    randomI <- sample(1:nrow(testdf), nrow(testdf))
-    randomtest <- testdf[randomI, ]
-    
-    # train a gbm model
-    testgbm <- gbm(formula = occurrence ~ .,
-                   distribution = 'bernoulli',
-                   data = randomtest,
-                   n.trees = 3000,
-                   interaction.depth = 10,
-                   shrinkage = 0.001,
-                   bag.fraction = 0.5,
-                   cv.folds = 10,
-                   n.cores = NULL,
-                   verbose = FALSE)
-    
-    # create dataframes of pdp values predicted by gbm
-    dftest <- 
-      testgbm %>% 
-      pdp::partial(pred.var = paste(j),
-                   grid.resolution = 102,
-                   n.trees = testgbm$n.trees,
-                   prob = TRUE)
-    
-    dftest$run <- i
-    testlist[[j]] <- dftest
-  }
-  return(testlist)
+  write.csv(spreaddf[[i]], paste0(dfvars[i], '.csv'))
+
 }
 
 
-prog <- 1
-niters <- 1e6
-endend <- 3
-bar <- txtProgressBar(min = 0, max = endend, style = 3)
-for(i in 1:niters) {
-  setTxtProgressBar(bar, value = prog)
-  prog <- prog + 1
-  if(prog == niters){print('done!')}
-}
 
-pbar <- lapply(seq(1:endend), function(x) {
-  for(i in 1:niters){
-    setTxtProgressBar(bar, value = prog)
-    prog <- prog + 1
-    setTxtProgressBar(bar, x)
-  }
-})
+#as.data.frame(matrix(alldf[[1]][, 2], nrow = 102, ncol = 1000)) loses the first col
+testdf <- 
+  alldf[[13]][1:306, ]
+
+testdf3 <- 
+  testdf %>% 
+  mutate(id = rep(1:102, length.out = n())) %>% 
+  mutate(refid = paste(.[[1]], id, sep = '_')) %>% 
+  group_by(refid) %>%
+  summarise(totalmean = mean(yhat),
+            totalsd = sd(yhat),
+            totaln = n(),
+            totalse = totalsd/sqrt(totaln),
+            totalmax = max(yhat),
+            totalmin = min(yhat),
+            lowerci = totalmean - qt(1 - (0.1/2), totaln - 1) * totalse,
+            upperci = totalmean + qt(1 - (0.1/2), totaln - 1) * totalse) %>% 
+  separate(refid, into = c('logCoastLength', 'id'), sep = '_') %>% 
+  mutate(logCoastLength = as.numeric(logCoastLength))
+
+testplot <- 
+  ggplot(testdf3, aes(x = logCoastLength, y = totalmean, group = 1)) +
+  geom_ribbon(aes(ymin = lowerci, ymax = upperci),
+              alpha = 0.6, fill = 'steelblue4') +
+  geom_line() +
+  theme_classic()
+
+print(testplot)
 
 
 
-testlist <- list()
-prog <- 1
-#fin <- 9
-bootend <- 3
-bar <- txtProgressBar(min = 0, max = bootend, style = 3)
+#-------------------------------------------------------------------------------
 
-testfun <- lapply(seq(1:bootend), function(x) {
-  for(i in names(testdf)[2:4]) {
-    
-    #setTxtProgressBar(bar, value = prog)
-    #prog = prog + 1
-    
-    randomI <- sample(1:nrow(testdf), nrow(testdf))
-    randomtest <- testdf[randomI, ]
-    
-    # train a gbm model
-    testgbm <- gbm(formula = occurrence ~ .,
-                   distribution = 'bernoulli',
-                   data = randomtest,
-                   n.trees = 3000,
-                   interaction.depth = 10,
-                   shrinkage = 0.001,
-                   bag.fraction = 0.5,
-                   cv.folds = 10,
-                   n.cores = NULL,
-                   verbose = FALSE)
-    
-    # create dataframes of pdp values predicted by gbm
-    dftest <- 
-      testgbm %>% 
-      pdp::partial(pred.var = paste(i),
-                   grid.resolution = 102,
-                   n.trees = testgbm$n.trees,
-                   prob = TRUE)
-    
-    dftest$run <- x
-    testlist[[i]] <- dftest
-    
-    setTxtProgressBar(bar, x)
-  }
-  return(testlist)
-})
+
+for(i in 1:1000)
+  dataframe <- pdpdf[[i]]
+  dataframe <- rbind(dataframe + pdpdf[[i]])
 
 
 pdpresults <- 
