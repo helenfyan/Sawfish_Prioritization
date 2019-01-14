@@ -212,7 +212,7 @@ faoRaw <- read_csv('./FAO Consumption/FAOConsumptRaw_180513.csv')
 
 faoClean <-
   faoRaw %>%
-  select(Country, Element, Item, Year, Unit, Value) %>%
+  dplyr::select(Country, Element, Item, Year, Unit, Value) %>%
   filter(Element == 'Protein supply quantity (g/capita/day)') %>%
   mutate(Country = dplyr::recode(Country, 
                                  `China, Hong Kong SAR` = 'China',
@@ -415,8 +415,7 @@ fins <-
   mutate(unit = 'USD-Exports') %>%
   .[, c(1, 6, 2:5)]
 
-write.csv(fins, 'ChondExpsClean_181119.csv')  
-
+write.csv(fins, 'ChondExpsClean_181119.csv')
 
 # Clean Chond Landings data ----------------------------------------------------------------
 
@@ -457,7 +456,6 @@ land <-
   .[, c(1, 5, 2:4)]
 
 write.csv(land, 'ChondLandClean_181119.csv')
-
 
 # Clean total fishery production data ----------------------------------------
 
@@ -500,3 +498,38 @@ prod <-
   mutate(unit = 'productionTonnes')
 
 write.csv(prod, 'FisheryProductionClean_181119.csv')
+
+
+# Create .csv file for each spp EOO ----------------------------------------
+
+all <- read_csv('CompleteSpeciesISO_180924.csv')
+
+large <- 
+  all %>% 
+  dplyr::filter(species == 'large')
+
+write.csv(large, 'EOOLarge_190114.csv')
+
+small <- 
+  all %>% 
+  dplyr::filter(species == 'small')
+
+write.csv(small, 'EOOSmall_190114.csv')
+
+dwarf <- 
+  all %>% 
+  dplyr::filter(species == 'dwarf')
+
+write.csv(dwarf, 'EOODwarf_190114.csv')
+
+narrow <- 
+  all %>% 
+  dplyr::filter(species == 'narrow')
+
+write.csv(narrow, 'EOONarrow_190114.csv')
+
+green <- 
+  all %>% 
+  dplyr::filter(species == 'green')
+
+write.csv(green, 'EOOGreen_190114.csv')
