@@ -1,6 +1,6 @@
 # THIS SCRIPT CLEANS AND COMBINES THE DATA FROM THE WORKSHOP #
 
-setwd('/users/helenyan/desktop/school/directed studies 2018/datasets')
+setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/')
 
 library(tidyverse)
 
@@ -533,3 +533,30 @@ green <-
   dplyr::filter(species == 'green')
 
 write.csv(green, 'EOOGreen_190114.csv')
+
+
+# Catch data from Lindsay ----------------------------------------
+
+sau <- read_csv('LDavidson/ForLindsay_Chondrichthyes_EEZ_160716.csv')
+tax <- read_csv('LDavidson/Chondrichthyes_Taxa_original.csv')
+
+# get country and last year of entry
+maxyear <- 
+  sau %>% 
+  group_by(name) %>% 
+  slice(which.max(year))
+
+# entries with correct max year
+maxyearonly <- 
+  maxyear %>% 
+  select(name, year, catch_sum, ISO) %>% 
+  left_join(., sau, by = c('name', 'year'))
+
+# sum of catch for each country with max year
+saufinal <- 
+  maxyearonly %>% 
+  group_by(name, ISO.x) %>% 
+  summarise(sum.catch = sum(catch_sum.y)) %>% 
+  ungroup()
+
+write.csv(saufinal, 'LDavidsonCatch_190115.csv')
