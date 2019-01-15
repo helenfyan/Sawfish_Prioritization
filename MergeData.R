@@ -11,7 +11,7 @@ iso <-
   iso %>%
   distinct(ISO, .keep_all = TRUE) %>%
   mutate(ISO3 = ISO) %>%
-  select(-ISO)
+  dplyr::select(-ISO)
 
 SauClean <- read.csv('SauFishingGear_181109.csv')
 BioInd <- read.csv('BiodiversityIndexData_180513.csv')
@@ -33,6 +33,7 @@ Wgi <- read.csv('WorldGovInd_180515.csv')
 pprod <- read.csv('PProdRaw_181012.csv')
 ManNew <- read_csv('Mangrove_Area_ISO_181107.csv')
 Fishery <- read_csv('FisheryProductionClean_181119.csv')
+Lcatch <- read_csv('LDavidsonCatch_190115.csv')
 
 # Can't merge sst data with this dataset because there's a different
 # value for each country depending on the range of the species in the region
@@ -40,64 +41,64 @@ Fishery <- read_csv('FisheryProductionClean_181119.csv')
 # Clean fin export data
 FinExp <-
   Exports %>%
-  select(-X1, -year, -unit, -country) %>%
+  dplyr::select(-X1, -year, -unit, -country) %>%
   filter(product == 'fins') %>%
   dplyr::rename(FinUSD = value,
                 ISO3 = ISO) %>%
-  select(-product) 
+  dplyr::select(-product) 
 
 # Clean chond landings data
 Land <-
   Landings %>%
-  select(-X1, -year, -unit, -country) %>%
+  dplyr::select(-X1, -year, -unit, -country) %>%
   dplyr::rename(ChondLand = total,
                 ISO3 = ISO)
 
 # Clean fishery landings data
 Fish <-
   Fishery %>%
-  select(-X1, -year, -unit, -country) %>%
+  dplyr::select(-X1, -year, -unit, -country) %>%
   dplyr::rename(FishProd = total,
          ISO3 = ISO)
 
 # Clean SAU fishing gear data
 SauClean <-
   SauClean %>%
-  select(-X, -totalGearValue) %>%
+  dplyr::select(-X, -totalGearValue) %>%
   dplyr::rename(ISO3 = ISO)
 
 # Clean GIS-derived data 
 PriProd <-
   pprod %>%
-  select(ISO_Ter1, MEAN_PPROD) %>%
+  dplyr::select(ISO_Ter1, MEAN_PPROD) %>%
   dplyr::rename(ISO3 = ISO_Ter1, PprodMean = MEAN_PPROD)
 
 # Rename NBI column 
 BioInd <-
   BioInd %>%
-  select(-X, -Country, -NBIScale)
+  dplyr::select(-X, -Country, -NBIScale)
 
 # Clean coastal pop 
 CoastPop <-
   CoastPop %>%
-  select(ISO3, CoastPop)
+  dplyr::select(ISO3, CoastPop)
 
 # Clean coastline length 
 CoastLength <-
   CoastLength %>%
-  select(ISO3, Lengthkm) %>%
+  dplyr::select(ISO3, Lengthkm) %>%
   dplyr::rename(CoastLength = Lengthkm)
 
 # Clean EPI
 EnvPerf <-
   EnvPerf %>%
-  select(ISO, EPI) %>%
+  dplyr::select(ISO, EPI) %>%
   dplyr::rename(ISO3 = ISO)
 
 # Clean estuaries discharge 
 EstDis <-
   EstDis %>%
-  select(-DischargeScale) %>%
+  dplyr::select(-DischargeScale) %>%
   dplyr::rename(ISO3 = X, EstDis = Discharge)
 
 # Clean fin exports to HK 
@@ -109,18 +110,18 @@ EstDis <-
 # Clean protein diet
 Consumpt <-
   Consumpt %>%
-  select(ISO3, ProteinDiet)
+  dplyr::select(ISO3, ProteinDiet)
 
 # Clean GDP, HDI, and OHI 
 GdpHdiOhi <-
   GdpHdiOhi %>%
-  select(-Country)
+  dplyr::select(-Country)
 
 # Clean IUU fishing 
 
 Iuu <-
   Iuu %>%
-  select(ISO3, Iuu)
+  dplyr::select(ISO3, Iuu)
 
 # Clean columns, calculate impact, and scale mangrove loss #
 # No need to reverse direction of mangrove loss because it's reflected 
@@ -135,13 +136,13 @@ Iuu <-
 
 ManNew <-
   ManNew %>%
-  select(PARENT_ISO, MEAN_GIS_AREA_K) %>%
+  dplyr::select(PARENT_ISO, MEAN_GIS_AREA_K) %>%
   dplyr::rename(ISO3 = PARENT_ISO, Mang = MEAN_GIS_AREA_K)
 
 # Clean coral reef fishers
 ReefFishers <-
   ReefFishers %>%
-  select(ISO, no_reef_fishers) %>%
+  dplyr::select(ISO, no_reef_fishers) %>%
   dplyr::rename(ISO3 = ISO, ReefFishers = no_reef_fishers) %>%
   .[1:98, ] %>%
   mutate(ReefFishers = as.numeric(ReefFishers))
@@ -161,6 +162,12 @@ Saltmarsh <-
 Wgi <-
   Wgi %>%
   dplyr::rename(ISO3 = X)
+
+# Clean Lindsay's catch data
+Lcatch <- 
+  Lcatch %>% 
+  select(ISO.x, sum.catch) %>% 
+  dplyr::rename(ISO3 = ISO.x, ChondCatch = sum.catch)
 
 
 # Combine all scores into single df ----------------------------------------------------------------------
@@ -186,24 +193,25 @@ CountSum <-
   #left_join(., Saltmarsh, by = c('ISO3' = 'ISO3')) %>%
   #left_join(., ChondLand, by = c('ISO3' = 'ISO3')) %>%
   left_join(., Wgi, by = c('ISO3' = 'ISO3')) %>%
+  left_join(., Lcatch, by = c('ISO3' = 'ISO3')) %>% 
   distinct(ISO3, .keep_all = TRUE) %>%
   replace(., is.na(.), 0)
 
-allcols <- names(CountSum)
-cols <- allcols[3:20]
-colsScaled <- paste(cols, 'Scale', sep = '')
+#allcols <- names(CountSum)
+#cols <- allcols[3:221]
+#colsScaled <- paste(cols, 'Scale', sep = '')
 
-CountSumScale <-
-  CountSum %>%
-  rename_at(vars(cols), ~ colsScaled) %>%
-  mutate_at(3:20, funs(scale(.))) 
+#CountSumScale <-
+#  CountSum %>%
+#  rename_at(vars(cols), ~ colsScaled) %>%
+#  mutate_at(3:21, funs(scale(.))) 
 
 
-CountSumAll <-
-  CountSum %>%
-  left_join(., CountSumScale, by = c('ISO3' = 'ISO3')) %>%
-  select(-Country.y) %>%
-  dplyr::rename(country = Country.x)
+#CountSumAll <-
+#  CountSum %>%
+#  left_join(., CountSumScale, by = c('ISO3' = 'ISO3')) %>%
+#  dplyr::select(-Country.y) %>%
+#  dplyr::rename(country = Country.x)
 
 sapply(CountSumAll, function(x) sum(is.na(x)))
 
@@ -214,7 +222,7 @@ SppIso <- read_csv('CompleteSpeciesISO_180924.csv')
 
 SppCov <-
   SppIso %>%
-  left_join(., CountSumAll, by = c('ISO3' = 'ISO3')) %>%
+  left_join(., CountSum, by = c('ISO3' = 'ISO3')) %>%
   mutate(matchid = paste(ISO3, species, sep = '-'))
 
 sst <- read.csv('SSTRaw_181011.csv', na.strings = ' ')
@@ -236,7 +244,7 @@ sstDat <-
   mutate(SstMean = MEAN_SST) %>%
   dplyr::rename(ISO3 = ISO_TER1, occurrence = `PRESENCE`, country = `TERRITORY1`,
                 SstMeanScale = MEAN_SST) %>%
-  select(-Rowid, -FID, -BINOMIAL, -UNIQUE_FID, -GEONAME, -SOVEREIGN1,
+  dplyr::select(-Rowid, -FID, -BINOMIAL, -UNIQUE_FID, -GEONAME, -SOVEREIGN1,
          -FREQUENCY, -MAX_SST, -MIN_SST) %>%
   mutate_at('SstMeanScale', funs(scale(.) %>% as.vector)) %>%
   mutate(matchid2 = paste(ISO3, species, sep = '-'))
@@ -245,20 +253,20 @@ sstDat <-
 AllCov <-
   SppCov %>%
   left_join(., sstDat, by = c('matchid' = 'matchid2')) %>%
-  select(-country.y, -country.x, -matchid, -occurrence.y, -ISO3.y, -species.y) %>%
+  dplyr::select(-country.y, -country.x, -matchid, -occurrence.y, -ISO3.y, -species.y) %>%
   dplyr::rename(ISO3 = ISO3.x, species = species.x, 
          occurrence = occurrence.x) %>%
   mutate(refid2 = paste(ISO3, species, sep = '-')) %>%
   distinct(., refid2, .keep_all = TRUE) %>%
-  select(-refid2) %>%
-  .[, c(43, 1:6, 45, 7:24, 44, 25:42)] %>%
+  dplyr::select(-refid2) %>% 
+  .[, c(7, 1:6, 8:26, 28)] %>%
   filter(ISO3 != 'LAO') %>%
-  mutate(country = case_when(ISO3 == 'TLS' ~ 'Timor Leste',
-                             TRUE ~ as.character(country)))
+  mutate(Country = case_when(ISO3 == 'TLS' ~ 'Timor Leste',
+                             TRUE ~ as.character(Country)))
 
 sapply(AllCov, function(x) sum(is.na(x)))
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_181119.csv')
+write_csv(AllCov, 'CompleteSpeciesCovariates_190115.csv')
 
 
 # Create generic dataframe that is not species specific --------------------------------
@@ -270,40 +278,40 @@ write_csv(AllCov, 'CompleteSpeciesCovariates_181119.csv')
 
 sstCountryScaled <-
   sstDat %>%
-  select(c(1:5)) %>%
+  dplyr::select(c(1:5)) %>%
   dplyr::filter(occurrence != '2') %>%
   mutate(geo = paste(country, ISO3, sep = '-')) %>%
-  select(-country, -ISO3) %>%
+  dplyr::select(-country, -ISO3) %>%
   group_by(geo, occurrence) %>%
   dplyr::summarise(SstCountMeanScale = mean(SstMeanScale), 
             spp = paste(species, collapse = '-'), 
             sppres = length(species)) %>%
   mutate(sppres = case_when(occurrence == '0' ~ 0,
                             TRUE ~ as.numeric(sppres))) %>%
-  select(geo, SstCountMeanScale) %>%
+  dplyr::select(geo, SstCountMeanScale) %>%
   separate(col = geo, into = c('country', 'ISO3'), sep = '-')
 
 sstCountryRaw <-
   sstDat %>%
-  select(c(1:3, 5:6)) %>%
+  dplyr::select(c(1:3, 5:6)) %>%
   dplyr::filter(occurrence != '2') %>%
   mutate(geo = paste(country, ISO3, sep = '_')) %>%
-  select(-country, -ISO3) %>%
+  dplyr::select(-country, -ISO3) %>%
   group_by(geo, occurrence) %>%
   dplyr::summarise(SstCountMean = mean(SstMean), 
             spp = paste(species, collapse = '-'), 
             sppres = length(species)) %>%
   mutate(sppres = case_when(occurrence == '0' ~ 0,
                             TRUE ~ as.numeric(sppres))) %>%
-  select(geo, SstCountMean) %>%
+  dplyr::select(geo, SstCountMean) %>%
   separate(col = geo, into = c('country', 'ISO3'), sep = '_') %>%
   distinct(., country, .keep_all = TRUE)
 
 
 NoSpp <-
   AllCov %>%
-  select(c(1:7)) %>%
-  select(-c(1, 3, 7), -region, -presence, -country) %>%
+  dplyr::select(c(1:7)) %>%
+  dplyr::select(-c(1, 3, 7), -region, -presence, -country) %>%
   dplyr::filter(occurrence !='2') %>%
   group_by(ISO3, occurrence) %>%
   dplyr::summarise(spp = paste(species, collapse = '-'),
@@ -316,15 +324,15 @@ NoSpp <-
   left_join(., sstCountryRaw, by = c('ISO3' = 'ISO3')) %>%
   .[, c(5, 1, 3, 4, 2, 6)] %>%
   left_join(., sstCountryScaled, by = c('ISO3' = 'ISO3')) %>%
-  select(-country.y) %>%
+  dplyr::select(-country.y) %>%
   dplyr::rename(country = country.x) %>%
   left_join(., CountSumAll, by = c('ISO3' = 'ISO3')) %>%
-  select(-country.y) %>%
+  dplyr::select(-country.y) %>%
   dplyr::rename(country = country.x,
                 SstMean = SstCountMean,
                 SstMeanScale = SstCountMeanScale) %>%
-  distinct(., ISO3, .keep_all = TRUE) %>%
-  .[, c(1:6, 8:26, 7, 27:45)]
+  distinct(., ISO3, .keep_all = TRUE) %>% 
+  .[, c(1:6, 8:25, 7, 26:43)]
 
 sapply(NoSpp, function(x) sum(is.na(x)))
 
@@ -336,9 +344,9 @@ write_csv(NoSpp, 'CountryCovariates_181109.csv')
 # make histograms to assess which variables to transform
 sppDatahist <-
   AllCov %>%
-  select(2, 8:26) %>%
+  dplyr::select(2, 8:26) %>%
   distinct(., ISO3, .keep_all = TRUE) %>%
-  select(-ISO3) %>%
+  dplyr::select(-ISO3) %>%
   gather(key = covs)
 
 
@@ -358,15 +366,15 @@ for(i in unique(sppDatahist$covs)) {
 
 sppProc <- 
   AllCov %>%
-  filter(occurrence != '2') %>%
-  select(2, 4, 6, 8:26) %>%
+  filter(occurrence != '2') %>% 
+  dplyr::select(2, 4, 6, 8:26) %>%
   # create dummy variables for species
   mutate(refID = paste(ISO3, species, occurrence, sep = '_')) %>%
-  select(-ISO3) %>%
+  dplyr::select(-ISO3) %>%
   mutate(var = 1) %>%
   spread(species, var, fill = 0, sep = '') %>%
   separate(refID, into = c('ISO3', 'spp', 'occ'), sep = '_') %>%
-  select(-spp, -occ) %>%
+  dplyr::select(-spp, -occ) %>%
   .[, c(21, 1, 22:26, 2:20)] %>%
   # divide FinUSD/1000 like FAO raw presents
   mutate(FinUSD = FinUSD/1000) %>%
@@ -413,3 +421,38 @@ for(i in unique(procHist$key)) {
   )
 }
 
+
+# get data-deficients ---------------------------
+
+ddProc <- 
+  AllCov %>%
+  filter(occurrence == '2') %>% 
+  dplyr::select(2, 4, 6, 8:26) %>%
+  # create dummy variables for species
+  mutate(refID = paste(ISO3, species, occurrence, sep = '_')) %>% 
+  dplyr::select(-ISO3) %>%
+  mutate(var = 1) %>%
+  spread(species, var, fill = 0, sep = '') %>% 
+  separate(refID, into = c('ISO3', 'spp', 'occ'), sep = '_') %>%
+  dplyr::select(-spp, -occ) %>% 
+  .[, c(21, 1, 22:26, 2:20)] %>%
+  # divide FinUSD/1000 like FAO raw presents
+  mutate(FinUSD = FinUSD/1000) %>%
+  # log+1 transform the data
+  mutate_at(vars('FinUSD', 'ChondLand', 'FishProd', 'totalGearTonnes', 'PprodMean',
+                 'CoastPop', 'CoastLength', 'EstDis', 'ProteinDiet', 'GDP', 
+                 'Iuu', 'Mang'), log1p) %>%
+  dplyr::rename('logFinUSD' = 'FinUSD',
+                'logChondLand' = 'ChondLand',
+                'logFishProd' = 'FishProd',
+                'logtotalGearTonnes' = 'totalGearTonnes',
+                'logPprodMean' = 'PprodMean',
+                'logCoastPop' = 'CoastPop',
+                'logCoastLength' = 'CoastLength', 
+                'logEstDis' = 'EstDis', 
+                'logProteinDiet' = 'ProteinDiet', 
+                'logGDP' = 'GDP', 
+                'logIuu' = 'Iuu', 
+                'logMang' = 'Mang')
+
+write.csv(ddProc, 'ProcessedDataDeficients_181214.csv')
