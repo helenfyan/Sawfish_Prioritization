@@ -421,6 +421,34 @@ write.csv(fins, 'ChondExpsClean_181119.csv')
 
 landRaw <- read_csv('FAOChondLand_181116.csv')
 
+cols <- names(landRaw)
+
+# sum the catch data from 2003-2016
+landsum <- 
+  landRaw %>% 
+  dplyr::rename(country = `Country (Country)`,
+               species = `Species (ASFIS species)`,
+               area = `Fishing area (FAO major fishing area)`,
+               unit = `Unit (Unit)`) %>% 
+  gather(key = year, value = value, '1950':'2016') %>% 
+  na_if(., '...') %>% 
+  na_if(., '-') %>% 
+  #replace(., is.na(.), 0) %>% 
+  drop_na(value) %>% 
+  mutate(value = dplyr::recode(value, '0 0' = '0')) %>% 
+  separate(value, into = c('value', 'val2'), sep = ' ') %>% 
+  select(-val2) %>% 
+  mutate(value = as.numeric(value)) %>% 
+  mutate(year = as.numeric(year)) %>% 
+  filter(year > 2002) %>% 
+  mutate(year = paste('X', year, sep = '')) %>% 
+  group_by(country) %>% 
+  summarise(totalCatch = sum(value))
+
+# LEARN HOW TO USE THE COUNTRIES PACKAGE SO YOU DON'T WASTE TIME RECODING EVERY
+# FUCKING COUNTRY INDIVIDUALLY
+
+
 land <-
   landRaw %>%
   dplyr::rename(country = `Country (Country)`,
@@ -535,7 +563,7 @@ green <-
 write.csv(green, 'EOOGreen_190114.csv')
 
 
-# Catch data from Lindsay ----------------------------------------
+# SAUP catch data from Lindsay ----------------------------------------
 
 sau <- read_csv('LDavidson/ForLindsay_Chondrichthyes_EEZ_160716.csv')
 tax <- read_csv('LDavidson/Chondrichthyes_Taxa_original.csv')
