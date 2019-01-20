@@ -3,6 +3,7 @@
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/')
 
 library(tidyverse)
+library(countrycode)
 
 # Clean occurrence data -------------------------------------------------------------
 
@@ -443,10 +444,12 @@ landsum <-
   filter(year > 2002) %>% 
   mutate(year = paste('X', year, sep = '')) %>% 
   group_by(country) %>% 
-  summarise(totalCatch = sum(value))
+  summarise(totalCatch = sum(value)) %>% 
+  mutate(ISO3 = countrycode(landsum$country, 'country.name', 'iso3c')) %>% 
+  drop_na() %>% 
+  .[, c(1, 3, 2)]
 
-# LEARN HOW TO USE THE COUNTRIES PACKAGE SO YOU DON'T WASTE TIME RECODING EVERY
-# FUCKING COUNTRY INDIVIDUALLY
+write.csv(landsum, 'FAOChondCatch_190119.csv')
 
 
 land <-
