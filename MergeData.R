@@ -33,7 +33,8 @@ Wgi <- read.csv('WorldGovInd_180515.csv')
 pprod <- read.csv('PProdRaw_181012.csv')
 ManNew <- read_csv('Mangrove_Area_ISO_181107.csv')
 Fishery <- read_csv('FisheryProductionClean_181119.csv')
-Lcatch <- read_csv('LDavidsonCatch_190115.csv')
+#Lcatch <- read_csv('LDavidsonCatch_190115.csv')
+ChondCatch <- read_csv('FAOChondcatch_190119.csv')
 
 # Can't merge sst data with this dataset because there's a different
 # value for each country depending on the range of the species in the region
@@ -164,11 +165,16 @@ Wgi <-
   dplyr::rename(ISO3 = X)
 
 # Clean Lindsay's catch data
-Lcatch <- 
-  Lcatch %>% 
-  select(ISO.x, sum.catch) %>% 
-  dplyr::rename(ISO3 = ISO.x, ChondCatch = sum.catch)
+#Lcatch <- 
+#  Lcatch %>% 
+#  select(ISO.x, sum.catch) %>% 
+#  dplyr::rename(ISO3 = ISO.x, ChondCatch = sum.catch)
 
+# Clean total summed catch
+ChondCatch <- 
+  ChondCatch %>% 
+  select(-X1, -country) %>% 
+  dplyr::rename(ChondCatch = totalCatch)
 
 # Combine all scores into single df ----------------------------------------------------------------------
 CountSum <-
@@ -193,7 +199,8 @@ CountSum <-
   #left_join(., Saltmarsh, by = c('ISO3' = 'ISO3')) %>%
   #left_join(., ChondLand, by = c('ISO3' = 'ISO3')) %>%
   left_join(., Wgi, by = c('ISO3' = 'ISO3')) %>%
-  left_join(., Lcatch, by = c('ISO3' = 'ISO3')) %>% 
+  #left_join(., Lcatch, by = c('ISO3' = 'ISO3')) %>% 
+  left_join(., ChondCatch, by = c('ISO3' = 'ISO3')) %>% 
   distinct(ISO3, .keep_all = TRUE) %>%
   replace(., is.na(.), 0)
 
@@ -266,7 +273,7 @@ AllCov <-
 
 sapply(AllCov, function(x) sum(is.na(x)))
 
-write_csv(AllCov, 'CompleteSpeciesCovariates_190115.csv')
+write_csv(AllCov, 'CompleteSpeciesCovariates_190119.csv')
 
 
 # Create generic dataframe that is not species specific --------------------------------
@@ -341,10 +348,12 @@ write_csv(NoSpp, 'CountryCovariates_181109.csv')
 
 # Tranformations ------------------------------------------------------------------
 
+spp <- read_csv('CompleteSpeciesCovariates_190119.csv')
+
 # make histograms to assess which variables to transform
 sppDatahist <-
-  AllCov %>%
-  dplyr::select(2, 8:26) %>%
+  spp %>%
+  dplyr::select(2, 8:27) %>%
   distinct(., ISO3, .keep_all = TRUE) %>%
   dplyr::select(-ISO3) %>%
   gather(key = covs)
@@ -365,23 +374,23 @@ for(i in unique(sppDatahist$covs)) {
 # processing the data -------------------------------------------------
 
 sppProc <- 
-  AllCov %>%
+  spp %>%
   filter(occurrence != '2') %>% 
-  dplyr::select(2, 4, 6, 8:26) %>%
+  dplyr::select(2, 4, 6, 8:27) %>%
   # create dummy variables for species
   mutate(refID = paste(ISO3, species, occurrence, sep = '_')) %>%
   dplyr::select(-ISO3) %>%
   mutate(var = 1) %>%
   spread(species, var, fill = 0, sep = '') %>%
   separate(refID, into = c('ISO3', 'spp', 'occ'), sep = '_') %>%
-  dplyr::select(-spp, -occ) %>%
-  .[, c(21, 1, 22:26, 2:20)] %>%
+  dplyr::select(-spp, -occ) %>% 
+  .[, c(22:27, 1:21)] %>%
   # divide FinUSD/1000 like FAO raw presents
   mutate(FinUSD = FinUSD/1000) %>%
   # log+1 transform the data
   mutate_at(vars('FinUSD', 'ChondLand', 'FishProd', 'totalGearTonnes', 'PprodMean',
                  'CoastPop', 'CoastLength', 'EstDis', 'ProteinDiet', 'GDP', 
-                 'Iuu', 'Mang'), log1p) %>%
+                 'Iuu', 'Mang', 'ChondCatch'), log1p) %>%
   dplyr::rename('logFinUSD' = 'FinUSD',
                 'logChondLand' = 'ChondLand',
                 'logFishProd' = 'FishProd',
@@ -393,9 +402,10 @@ sppProc <-
                 'logProteinDiet' = 'ProteinDiet', 
                 'logGDP' = 'GDP', 
                 'logIuu' = 'Iuu', 
-                'logMang' = 'Mang')
+                'logMang' = 'Mang',
+                'logChondCatch' = 'ChondCatch')
 
-write.csv(sppProc, 'ProcessedCovariates_181128.csv')
+write.csv(sppProc, 'ProcessedCovariates_190119.csv')
 
 
 # check normality around these variables ----------------
@@ -441,7 +451,7 @@ ddProc <-
   # log+1 transform the data
   mutate_at(vars('FinUSD', 'ChondLand', 'FishProd', 'totalGearTonnes', 'PprodMean',
                  'CoastPop', 'CoastLength', 'EstDis', 'ProteinDiet', 'GDP', 
-                 'Iuu', 'Mang'), log1p) %>%
+                 'Iuu', 'Mang', 'ChondCatch'), log1p) %>%
   dplyr::rename('logFinUSD' = 'FinUSD',
                 'logChondLand' = 'ChondLand',
                 'logFishProd' = 'FishProd',
@@ -453,6 +463,7 @@ ddProc <-
                 'logProteinDiet' = 'ProteinDiet', 
                 'logGDP' = 'GDP', 
                 'logIuu' = 'Iuu', 
-                'logMang' = 'Mang')
+                'logMang' = 'Mang',
+                'logChondCatch' = 'ChondCatch')
 
 write.csv(ddProc, 'ProcessedDataDeficients_181214.csv')
