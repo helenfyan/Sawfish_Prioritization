@@ -591,3 +591,39 @@ saufinal <-
   ungroup()
 
 write.csv(saufinal, 'LDavidsonCatch_190115.csv')
+
+# Clean GBM Out Iterations --------------------------------------------------------------------
+rm(list=ls())
+
+setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/gbm out/')
+
+old <- list.files(pattern="Iter1*")
+olddf <- lapply(old, read_csv)
+
+new <- list.files(pattern = "GBMResults2*")
+newdf <- lapply(new, read_csv)
+
+#vars1 <- sub('GBMResults2', '', new) 
+#vars <- sub('_190130.csv', '', vars1)
+
+dfs <- list()
+for(i in 1:20) {
+  
+  dfs[[i]] <- 
+    olddf[[i]] %>% 
+    rbind(., olddf[[i + 20]]) %>% 
+    rbind(., newdf[[i]]) %>% 
+    dplyr::select(-X1) %>% 
+    group_by_(names(.)[c(1, 2)]) %>% 
+    summarise(totmean = mean(totalmean),
+              totmax = max(totalmax),
+              totmin = min(totalmin))
+  
+  dfscols <- colnames(dfs[[i]])
+  col <- dfscols[1] 
+  
+  write.csv(dfs[[i]], paste('CleanGBMout', col, '_190201.csv', sep = ''))
+  
+}
+
+, 'lowerci', 'upperci', 'totalsd', 'totaln', 'totalse'
