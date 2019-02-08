@@ -125,12 +125,13 @@ corfig <-
 
 print(corfig)
 
-
 #  -----------------------------------------------------------------
 #  Partial dependence plots ----------------------------------------
 #  -----------------------------------------------------------------
 
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/GBM out')
+
+library(tidyverse)
 
 figs <- list.files(pattern = '*_190201.csv')
 dfs <- lapply(figs, read.csv)
@@ -141,7 +142,7 @@ for(i in 1:20) {
   
   pdpplot <- 
     ggplot(dfs[[i]], aes_string(x = colnames(dfs[[i]][2]), y = colnames(dfs[[i]][3]), 
-                         group = 1)) +
+                                group = 1)) +
     geom_ribbon(aes(ymin = totmin, ymax = totmax),
                 alpha = 0.6, fill = 'steelblue4') +
     geom_line(size = 1) +
@@ -157,277 +158,359 @@ for(i in 1:20) {
 }
 
 #  -----------------------------------------------------------------
-#  Map of EOO for each spp -----------------------------------------
+#  Multipanel plots ------------------------------------------------
 #  -----------------------------------------------------------------
-library(tidyverse)
-library(maptools)
-library(broom)
-library(RColorBrewer)
 
-# presentation theme for maps
+# Match Trevor Branch's figures with standardized axes -------------
+library(facetscales)
+library(gridExtra)
+library(grid)
 
-map_theme <- function(legendSpace = 0.2, legendText = 13) {
-  
-  theme(plot.background = element_rect(fill = 'transparent', colour = NA),
-        panel.background = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        legend.text = element_text(size = legendText),
-        legend.title = element_blank(),
-        legend.spacing.x = unit(legendSpace, 'cm'),
-        legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
-        legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
-  
+pdp_theme <- function(axis_text_size = 13, axis_y_ticks = element_line()) {
+  theme(panel.background = element_blank(),
+        axis.line.y = element_line(colour = 'grey60'),
+        axis.line.x = element_line(colour = 'grey60'),
+        axis.text.y = element_text(size = axis_text_size, colour = 'grey20'),
+        axis.text.x = element_text(colour = 'grey20', size = 13),
+        axis.ticks.y = axis_y_ticks,
+        axis.title = element_text(size = 20, colour = 'grey20'),
+        strip.text = element_blank(),
+        panel.spacing = unit(0, 'lines'),
+        panel.border = element_rect(colour = 'grey60', size = 1, fill = NA))
 }
 
-# make a dataframe for each species
-raw <- read_csv('CompleteSpeciesISO_180924.csv')
+# try for pressures -----------------------
+diet <- dfs[[9]]
+land <- dfs[[10]] 
+catch <- dfs[[2]]
+pop <- dfs[[4]] 
 
-all <- 
-  raw %>% 
-  dplyr::select(country, ISO3, species, presence) %>% 
-  mutate(presence = dplyr::recode(presence, 'present' = 'Extant',
-                                  'absent' = 'Extinct',
-                                  'unknown' = 'Presence Unknown'))
+long_fun <- function(x) {
+  x %>% 
+    dplyr::select(-X) %>% 
+    gather(variable, stdvalue, 1) %>% 
+    mutate_at(vars(stdvalue), funs(scale(.)))
+}
 
-large <- 
-  all %>% 
-  filter(species == 'large')
+fishpressures <- list(diet, land, catch, pop) %>% 
+  lapply(long_fun)
 
-small <- 
-  all %>% 
-  filter(species == 'small')
+finalfish <- data.frame()
+for(i in 1:4) {
+  df <- fishpressures[[i]]
+  finalfish <- rbind(finalfish, df)
+}
 
-narrow <- 
-  all %>% 
-  filter(species == 'narrow')
+finalfish_f <- 
+  finalfish %>% 
+  mutate(variable = factor(variable, 
+                           levels = c('logProteinDiet', 'logtotalGearTonnes',
+                                      'logChondCatch', 'logCoastPop')))
 
-green <- 
-  all %>% 
-  filter(species == 'green')
+fishscales <- list(
+  'logProteinDiet' = scale_y_continuous(limits = c(0.15, 0.7),
+                                        breaks = seq(0.1, 0.7, 0.1)),
+  'logtotalGearTonnes' = scale_y_continuous(limits = c(0.2, 0.6), 
+                                            breaks = seq(0.2, 0.6, 0.1)),
+  'logChondCatch' = scale_y_continuous(limits = c(0.34, 0.45),
+                                       breaks = seq(0.36, 0.42, 0.06)),
+  'logCoastPop' = scale_y_continuous(limits = c(0.35, 0.45),
+                                     breaks = seq(0.36, 0.4, 0.04))
+)
 
-dwarf <- 
-  all %>% 
-  filter(species == 'dwarf')
+fishtitle <- 
+  data.frame(
+    label = c('a) Marine protein consumption', 'b) Gear-restricted landings',
+              'c) Chondrichthyes landings', 'd) Coastal population'),
+    variable = c('logProteinDiet', 'logtotalGearTonnes', 'logChondCatch', 'logCoastPop'),
+    x = c(-1, -1.1, -1.09, -1.26),
+    y = c(0.7, 0.6, 0.43, 0.43)
+  )
 
-data(wrld_simpl)
-wrld <- broom::tidy(wrld_simpl, region = 'ISO3')
+fish <- 
+  ggplot(finalfish_f, aes(x = stdvalue, y = totmean)) +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax),
+              alpha = 0.6, fill = 'dodgerblue') +
+  geom_line(size = 1) +
+  #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y')
+  facet_grid_sc(rows = vars(variable), space = 'free_y', 
+                scales = list(y = fishscales)) +
+  pdp_theme() +
+  labs(x = '', y = 'Marginal Effect on Occurrence') +
+  theme(plot.margin = unit(c(0.1, 0, -0.5, 1), 'cm'))
+  #geom_text(data = fishtitle, mapping = aes(x = x, y = y, label = label), size = 5)
 
-wrld <- 
-  wrld %>% 
-  filter(id != 'ATA') %>% 
-  filter(between(lat, -50, 55)) %>% 
-  filter(long >= -130)
-
-SEasia <- 
-  wrld %>% 
-  filter(long >= 10)
-
-Atla <- 
-  wrld %>% 
-  filter(long < 30)
-
-lrg <- 
-  ggplot() +
-  geom_map(data = wrld, map = wrld, 
-           aes(map_id = id, x = long, y = lat),
-           fill = 'grey90', colour = 'black', size = 0.25) +
-  geom_map(data = large, map = wrld,
-           aes(map_id = ISO3, fill = presence), colour = 'black', size = 0.25) +
-  scale_fill_manual(values = c('Extinct' = '#b2182b',
-                               'Extant' = '#2166ac',
-                               'Presence Unknown' = '#f4a582')) +
-  theme(plot.background = element_rect(fill = 'transparent', colour = NA),
-        panel.background = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        legend.text = element_text(size = 10),
-        legend.title = element_blank(),
-        legend.spacing.x = unit(0.2, 'cm'),
-        legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
-        legend.key = element_rect(fill = 'transparent', colour = 'transparent'),
-        legend.position = c(0.12, 0.12)) +
-  coord_map() +
-  annotate('text', x = -90, y = 60, label = 'e) Pristis pristis', 
-           size = 7, fontface = 'italic') +
-  labs(y = '', title = 'Largetooth Sawfish', x = '')
-
-pdf('../Figures/MapSpLargeEOO_181219.pdf')
-print(lrg)
-dev.off()
+print(fish)
 
 
-sml <- 
-  ggplot() +
-  geom_map(data = Atla, map = Atla, 
-           aes(map_id = id, x = long, y = lat),
-           fill = 'grey90', colour = 'black', size = 0.25) +
-  geom_map(data = small, map = Atla,
-           aes(map_id = ISO3, fill = presence), colour = 'black', size = 0.25) +
-  scale_fill_manual(values = c('Extinct' = '#8e0152',
-                               'Extant' = '#01665e',
-                               'Presence Unknown' = '#f1b6da')) +
-  coord_map() +
-  map_theme() +
-  theme(legend.position = c(0.18, 0.12)) +
-  annotate('text', x = -100, y = 60, label = 'c) Pristis pectinata',
-           size = 7, fontface = 'italic') +
-  labs(y = '', x = '', title = 'Smalltooth Sawfish')
 
-pdf('../Figures/MapSpSmallEOO_181219.pdf')
-print(sml)
-dev.off()
+# try for management -----------------------
+ohi <- dfs[[13]]
+nbi <- dfs[[11]]
+hdi <- dfs[[1]]
+wgi <- dfs[[20]]
+gdp <- dfs[[6]]
 
+manage <- list(ohi, nbi, hdi, wgi, gdp) %>% 
+  lapply(long_fun)
 
-nar <- 
-  ggplot() +
-  geom_map(data = SEasia, map = SEasia, 
-           aes(map_id = id, x = long, y = lat),
-           fill = 'grey90', colour = 'black', size = 0.25) +
-  geom_map(data = narrow, map = SEasia,
-           aes(map_id = ISO3, fill = presence), colour = 'black', size = 0.25) +
-  scale_fill_manual(values = c('Extinct' = '#67001f',
-                               'Extant' = '#4393c3',
-                               'Presence Unknown' = '#f4a582')) +
-  coord_map() +
-  map_theme() +
-  theme(legend.position = c(0.3, 0.14)) +
-  annotate('text', x = 55, y = 60, label = 'a) Anoxypristis cuspidata', 
-           size = 7, fontface = 'italic') +
-  labs(y = '', x = '', title = 'Narrow Sawfish')
+finalmanage <- data.frame()
+for(i in 1:5) {
+  df <- manage[[i]]
+  finalmanage <- rbind(finalmanage, df)
+}
 
-pdf('../Figures/MapSpNarrowEOO_181219.pdf')
-print(nar)
-dev.off()
+finalmanage_f <- 
+  finalmanage %>% 
+  mutate(variable = factor(variable, levels = c('OHI', 'NBI', 'HDI', 
+                                                'WGI', 'logGDP')))
 
+manscales <- 
+  list(
+    'OHI' = scale_y_continuous(limits = c(0.3, 0.5), breaks = seq(0.3, 0.45, 0.05)),
+    'NBI' = scale_y_continuous(limits = c(0.32, 0.5), breaks = seq(0.35, 0.45, 0.05)),
+    'HDI' = scale_y_continuous(limits = c(0.32, 0.45), breaks = seq(0.36, 0.42, 0.06)),
+    'WGI' = scale_y_continuous(limits = c(0.32, 0.5), breaks = seq(0.35, 0.45, 0.05)),
+    'logGDP' = scale_y_continuous(limits = c(0.3, 0.45), breaks = seq(0.32, 0.4, 0.08))
+  )
 
-gre <- 
-  ggplot() +
-  geom_map(data = SEasia, map = SEasia, 
-           aes(map_id = id, x = long, y = lat),
-           fill = 'grey90', colour = 'black', size = 0.25) +
-  geom_map(data = green, map = SEasia,
-           aes(map_id = ISO3, fill = presence), colour = 'black', size = 0.25) +
-  scale_fill_manual(values = c('Extinct' = '#c51b7d',
-                               'Extant' = '#276419',
-                               'Presence Unknown' = '#f1b6da')) +
-  coord_map() +
-  map_theme() +
-  theme(legend.position = c(0.3, 0.14)) +
-  annotate('text', x = 40, y = 60, label = 'd) Pristis zijsron',
-           size = 7, fontface = 'italic') +
-  labs(y = '', x = '', title = 'Green Sawfish')
+mantitle <- 
+  data.frame(
+    label = c('e) Ocean Health Index', 'f) National Biodiversity Index',
+              'g) Human Development Index', 'h) World Governance Index', 
+              'i) Gross Domestic Product'),
+    variable = c('OHI', 'NBI', 'HDI', 'WGI', 'logGDP'),
+    x = c(-1.2, -1.05, -1, -1.07, -1.1),
+    y = c(0.5, 0.48, 0.45, 0.44, 0.48)
+  )
 
-pdf('../Figures/MapSpGreenEOO_181219.pdf')
-print(gre)
-dev.off()
+man <- 
+  ggplot(finalmanage_f, aes(x = stdvalue, y = totmean)) +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax),
+              alpha = 0.6, fill = 'deeppink4') +
+  geom_line(size = 1) +
+  facet_grid_sc(rows = vars(variable), space = 'free_y', scales = list(y = manscales)) +
+  pdp_theme() +
+  labs(y = '', x = '') +
+  theme(plot.margin = unit(c(0.1, 0, -0.5, -0.05), 'cm'))
+  #geom_text(data = mantitle, mapping = aes(x = x, y = y, label = label), size = 5)
 
+print(man)
 
-dwf <- 
-  ggplot() +
-  geom_map(data = SEasia, map = SEasia, 
-           aes(map_id = id, x = long, y = lat),
-           fill = 'grey90', colour = 'black', size = 0.25) +
-  geom_map(data = dwarf, map = SEasia,
-           aes(map_id = ISO3, fill = presence), colour = 'black', size = 0.25) +
-  scale_fill_manual(values = c('Extinct' = '#762a83',
-                               'Extant' = '#1b7837',
-                               'Presence Unknown' = '#c2a5cf')) +
-  coord_map() +
-  map_theme() +
-  theme(legend.position = c(0.3, 0.14)) +
-  annotate('text', x = 45, y = 60, label = 'b) Pristis clavata',
-           size = 7, fontface = 'italic') +
-  labs(y = '', x = '', title = 'Dwarf Sawfish')
+# try for ecology -----------------------
+coast <- dfs[[3]]
+mang <- dfs[[7]]
+est <- dfs[[5]]
+prod <- dfs[[8]]
+sst <- dfs[[19]]
 
-pdf('../Figures/MapSpDwarfEOO_181219.pdf')
-print(dwf)
-dev.off()
+eco <- list(coast, mang, est, prod, sst) %>% 
+  lapply(long_fun)
 
+finaleco <- data.frame()
+for(i in 1:5) {
+  df <- eco[[i]]
+  finaleco <- rbind(finaleco, df)
+}
 
-#  -----------------------------------------------------------------
-#  Map of predictions ----------------------------------------------
-#  -----------------------------------------------------------------
-library(tidyverse)
-library(maptools)
-library(broom)
-library(RColorBrewer)
+finaleco_f <- 
+  finaleco %>% 
+  mutate(variable = factor(variable, levels = c('logCoastLength', 'logMang',
+                                                'logEstDis', 'logPprodMean',
+                                                'SstMean')))
 
-rawpred <- read_csv('GBMPredicted_181214.csv')
+ecoscales <- list(
+  'logCoastLength' = scale_y_continuous(limits = c(0.1, 0.8),
+                                        breaks = seq(0.1, 0.8, 0.1)),
+  'logMang' = scale_y_continuous(limits = c(0.3, 0.6),
+                                 breaks = seq(0.3, 0.6, 0.1)),
+  'logEstDis' = scale_y_continuous(limits = c(0.3, 0.6),
+                                   breaks = seq(0.3, 0.5, 0.1)),
+  'logPprodMean' = scale_y_continuous(limits = c(0.34, 0.5),
+                                      breaks = seq(0.35, 0.45, 0.1)),
+  'SstMean' = scale_y_continuous(limits = c(0.35, 0.5), 
+                                 breaks = seq(0.35, 0.45, 0.1))
+)
 
-pred <- 
-  rawpred %>% 
-  dplyr::select(-X1, -run) %>% 
-  dplyr::rename('probOcc' = '.') %>% 
-  group_by(ISO3) %>% 
-  summarise(totalprob = mean(probOcc)) %>% 
-  mutate(Probability = cut(totalprob, breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1),
-                        labels = c('<0.2', '0.2-0.4', '0.4-0.6', '0.6-0.8', '>0.8')))
-  
-data(wrld_simpl)
-wrld <- broom::tidy(wrld_simpl, region = 'ISO3')
+ecotitle <- 
+  data.frame(
+    label = c('j) Coastline length', 'k) Mangrove cover', 'l) Estuaries discharge rate',
+              'm) Primary productivity', 'n) Sea surface temperature'),
+    variable = c('logCoastLength', 'logMang', 'logEstDis', 'logPprodMean', 'SstMean'),
+    x = c(-1.02, -1.02, -0.7, -0.85, -0.65),
+    y = c(0.8, 0.59, 0.59, 0.46, 0.46)
+  )
 
-wrld <- 
-  wrld %>% 
-  filter(id != 'ATA')
+ecology <- 
+  ggplot(finaleco_f, aes(x = stdvalue, y = totmean)) +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax),
+              alpha = 0.6, fill = 'darkgreen') +
+  geom_line(size = 1) +
+  #facet_grid(variable ~ ., space = 'free_y', scales = 'free_y') +
+  facet_grid_sc(rows = vars(variable), space = 'free_y', 
+                scales = list(y = ecoscales)) +
+  pdp_theme() +
+  labs(y = '', x = '') +
+  theme(plot.margin = unit(c(0.1, 0.1, -0.5, -0.05), 'cm'))
+  #geom_text(data = ecotitle, mapping = aes(x = x, y = y, label = label), size = 5)
 
-predmap <- 
-  ggplot() +
-  geom_map(data = wrld, map = wrld,
-           aes(map_id = id, x = long, y = lat),
-           fill = 'grey90', colour = 'black', size = 0.25) +
-  geom_map(data = pred, map = wrld, 
-           aes(map_id = ISO3, fill = Probability), colour = 'black', size = 0.25) +
-  scale_fill_manual(values = c('<0.2' = '#67001f',
-                               '0.2-0.4' = '#d6604d',
-                               '0.4-0.6' = '#f4a582',
-                               '0.6-0.8' = '#4393c3',
-                               '>0.8' = '#053061')) +
-  coord_map() +
-  theme(plot.background = element_rect(fill = 'transparent', colour = NA),
-        panel.background = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        legend.text = element_text(size = 10),
-        legend.title = element_text(size = 11), 
-        legend.spacing.x = unit(0.2, 'cm'),
-        legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
-        legend.key = element_rect(fill = 'transparent', colour = 'transparent'),
-        legend.position = c(0.1, 0.3)) +
-  annotate('text', x = -70, y = 60, label = 'f) Predicted Occurrence', size = 7) +
-  labs(y = '', x = '', title = 'Predicted presence')
+print(ecology)
 
-pdf('../Figures/MapPredicted_181219.pdf')
-print(predmap)
-dev.off()
+allstd <- grid.arrange(fish, man, ecology, ncol = 3, 
+             bottom = grid::textGrob('Standardized Value', 
+                               gp = gpar(fontsize = 18, col = 'grey20'), 
+                               vjust = 1e-5, hjust = 0.35))
+
+ggsave('../../Figures/Publication/UnlabelledPDPstd_190206.pdf', allstd,
+       height = 19.05, width = 30.59, units = c('cm'))
 
 
-predmap2 <- 
-  ggplot() +
-  geom_map(data = wrld, map = wrld,
-           aes(map_id = id, x = long, y = lat),
-           fill = 'grey90', colour = 'black', size = 0.25) +
-  geom_map(data = pred, map = wrld, 
-           aes(map_id = ISO3, fill = Probability), colour = 'black', size = 0.25) +
-  scale_fill_manual(values = c('<0.2' = '#40004b',
-                               '0.2-0.4' = '#762a83',
-                               '0.4-0.6' = '#c2a5cf',
-                               '0.6-0.8' = '#35978f',
-                               '>0.8' = '#003c30')) +
-  coord_map() +
-  theme(plot.background = element_rect(fill = 'transparent', colour = NA),
-        panel.background = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        legend.text = element_text(size = 13),
-        legend.title = element_text(size = 14)) +
-  labs(y = '', x = '', title = 'Predicted presence')
+# ------------------------------------------------------------------------------
+# Trevor Branch's figures with unstandardized axes -----------------------------
+# ------------------------------------------------------------------------------
 
-pdf('../Figures/MapPredicted2_181219.pdf')
-print(predmap2)
-dev.off()
+setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/GBM out')
+library(cowplot)
+figs <- list.files(pattern = '*_190201.csv')
+
+dfs <- 
+  lapply(figs, read.csv)
+
+pdp_plot <- function(data, colour) {
+  ggplot(data, aes_string(x = colnames(data[2]), y = colnames(data[3]))) +
+    geom_ribbon(aes(ymin = totmin, ymax = totmax), alpha = 0.6, fill = colour) +
+    geom_line(size = 1) +
+    labs(y = '', x = '') +
+    panel_border(remove = FALSE) +
+    theme(axis.line.y = element_line(colour = 'grey60', size = 0.5),
+          axis.line.x = element_line(colour = 'grey60', size = 0.5),
+          panel.background = element_blank(),
+          axis.text.y = element_text(size = 13, colour = 'grey20'),
+          axis.text.x = element_text(size = 10, colour = 'grey20'),
+          axis.title.y = element_text(size = 15, colour = 'grey20'),
+          axis.title.x = element_text(size = 15, colour = 'grey20'),
+          panel.border = element_rect(size = 1, colour = 'grey60', fill = NA))
+}
+
+# fishing figs ------------------
+protein <- pdp_plot(dfs[[9]], 'dodgerblue') +
+  theme(plot.margin = unit(c(0.5, 0, -1, -0.05), 'cm')) +
+  scale_y_continuous(limits = c(0.15, 0.7), breaks = seq(0.2, 0.7, 0.1))
+
+gear <- pdp_plot(dfs[[10]], 'dodgerblue') +
+  theme(plot.margin = unit(c(0.2, 0, -1, -0.05), 'cm')) +
+  scale_y_continuous(limits = c(0.2, 0.6), breaks = seq(0.2, 0.6, 0.1)) +
+  ylab('Marginal Effect on Occurrence')
+
+catch <- pdp_plot(dfs[[2]], 'dodgerblue') +
+  theme(plot.margin = unit(c(0.2, 0, -1, -0.13), 'cm')) +
+  scale_y_continuous(limits = c(0.34, 0.45), breaks = seq(0.35, 0.45, 0.1))
+
+pop <- pdp_plot(dfs[[4]], 'dodgerblue') +
+  theme(plot.margin = unit(c(0.2, 0, 0.3, -0.13), 'cm')) +
+  scale_y_continuous(limits = c(0.35, 0.45), breaks = seq(0.36, 0.4, 0.04)) +
+  scale_x_continuous(limits = c(10, 20), breaks = seq(10, 20, 2.5))
 
 
-#  -----------------------------------------------------------------
-#  Maps pacakge in ggplot ------------------------------------------
-#  -----------------------------------------------------------------
+fishing <- plot_grid(protein, gear, catch, pop, ncol = 1, align = 'v',
+          rel_heights = c(3.8, 3.6, 1.5, 2), rel_widths = c(1, 1, 1, 1))
+
+# management figs ----------------------
+ohi <- pdp_plot(dfs[[13]], 'deeppink4') +
+  theme(plot.margin = unit(c(0.5, 0, -1, -0.05), 'cm')) +
+  scale_x_continuous(limits = c(40, 80), breaks = seq(40, 80, 10))
+
+nbi <- pdp_plot(dfs[[11]], 'deeppink4') +
+  theme(plot.margin = unit(c(0.2, 0, -1, -0.05), 'cm'))
+
+hdi <- pdp_plot(dfs[[1]], 'deeppink4') +
+  theme(plot.margin = unit(c(0.2, 0, -1, -0.05), 'cm'))
+
+wgi <- pdp_plot(dfs[[20]], 'deeppink4') +
+  theme(plot.margin = unit(c(0.2, 0, -1, -0.05), 'cm'))
+
+gdp <- pdp_plot(dfs[[6]], 'deeppink4') +
+  theme(plot.margin = unit(c(0.2, 0, 0.3, -0.13), 'cm')) +
+  scale_y_continuous(limits = c(0.30, 0.48), breaks = seq(0.32, 0.44, 0.06)) +
+  xlab('Value')
+
+
+management <- plot_grid(ohi, nbi, hdi, wgi, gdp, ncol = 1, align = 'v',
+                        rel_heights = c(1.2, 1.1, 0.8, 0.8, 0.9))
+
+# ecology figs ----------------------
+coast <- pdp_plot(dfs[[3]], 'darkgreen') +
+  theme(plot.margin = unit(c(0.5, 0.3, -1, -0.05), 'cm'))
+
+mang <- pdp_plot(dfs[[7]], 'darkgreen') +
+  theme(plot.margin = unit(c(0.2, 0.3, -1, -0.05), 'cm'))
+
+est <- pdp_plot(dfs[[5]], 'darkgreen') +
+  theme(plot.margin = unit(c(0.2, 0.3, -1, -0.05), 'cm'))
+
+prod <- pdp_plot(dfs[[8]], 'darkgreen') +
+  theme(plot.margin = unit(c(0.2, 0.3, -1, -0.05), 'cm')) +
+  scale_y_continuous(limits = c(0.34, 0.43), breaks = seq(0.35, 0.4, 0.05))
+
+sst <- pdp_plot(dfs[[19]], 'darkgreen') +
+  theme(plot.margin = unit(c(0.2, 0.3, 0.3, -0.13), 'cm')) +
+  scale_y_continuous(limits = c(0.35, 0.45), breaks = seq(0.35, 0.4, 0.05))
+
+ecology <- plot_grid(coast, mang, est, prod, sst, ncol = 1, align = 'v',
+                     rel_heights = c(3, 1.3, 1.3, 1, 1.5))
+
+
+allplots <- plot_grid(fishing, management, ecology, ncol = 3, align = 'hv')
+print(allplots)
+
+ggsave('../../Figures/Publication/UnlabelledPDP_190207.pdf', allplots,
+       height = 19.05, width = 30.58, units = c('cm'))
+
+
+
+
+dfslong <- 
+  lapply(figs, function(x) {
+    df <- read.csv(x) %>% 
+      dplyr::select(-1) %>% 
+      gather(variable, value, 1)
+    
+    return(df)
+  })
+
+alldfs <- data.frame()
+for(i in 1:20) {
+  datf <- dfs[[i]]
+  alldfs <- rbind(alldfs, datf)
+}
+
+longdfs <- 
+  alldfs %>% 
+  dplyr::filter(variable != 'occurrence' |
+                variable != 'speciesdwarf' |
+                variable != 'specieslarge' |
+                variable != 'speciesgreen' |
+                variable != 'speciessmall' |
+                variable != 'speciesnarrow') %>% 
+  mutate(category = case_when(variable == 'HDI' ~ 'management',
+                              variable == 'logGDP' ~ 'management',
+                              variable == 'NBI' ~ 'management',
+                              variable == 'OHI' ~ 'management',
+                              variable == 'WGI' ~ 'management',
+                              variable == 'logChondCatch' ~ 'fishing',
+                              variable == 'logCoastPop' ~ 'fishing',
+                              variable == 'logProteinDiet' ~ 'fishing',
+                              variable == 'logtotalGearTonnes' ~ 'fishing',
+                              variable == 'logCoastLength' ~ 'ecology',
+                              variable == 'logEstDis' ~ 'ecology',
+                              variable == 'logMang' ~ 'ecology',
+                              variable == 'logPprodMean' ~ 'ecology',
+                              variable == 'SstMean' ~ 'ecology'))
+
+
+# fishing pressures ---------------------------------
+
+fish <- 
+  longdfs %>% 
+  filter(category == 'fishing')
+
