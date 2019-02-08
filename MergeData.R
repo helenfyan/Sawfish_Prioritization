@@ -275,7 +275,6 @@ sapply(AllCov, function(x) sum(is.na(x)))
 
 write_csv(AllCov, 'CompleteSpeciesCovariates_190119.csv')
 
-
 # Create generic dataframe that is not species specific --------------------------------
 
 # Country specific ---------
@@ -344,7 +343,6 @@ NoSpp <-
 sapply(NoSpp, function(x) sum(is.na(x)))
 
 write_csv(NoSpp, 'CountryCovariates_181109.csv')
-
 
 # Tranformations ------------------------------------------------------------------
 
@@ -437,7 +435,9 @@ for(i in unique(procHist$key)) {
 ddProc <- 
   AllCov %>%
   filter(occurrence == '2') %>% 
-  dplyr::select(2, 4, 6, 8:26) %>%
+  dplyr::select(ISO3, species, occurrence, totalGearTonnes, PprodMean,
+                NBI, CoastPop, CoastLength, EstDis, ProteinDiet, GDP,
+                HDI, OHI, Mang, WGI, ChondCatch, SstMean) %>%
   # create dummy variables for species
   mutate(refID = paste(ISO3, species, occurrence, sep = '_')) %>% 
   dplyr::select(-ISO3) %>%
@@ -445,25 +445,18 @@ ddProc <-
   spread(species, var, fill = 0, sep = '') %>% 
   separate(refID, into = c('ISO3', 'spp', 'occ'), sep = '_') %>%
   dplyr::select(-spp, -occ) %>% 
-  .[, c(21, 1, 22:26, 2:20)] %>%
-  # divide FinUSD/1000 like FAO raw presents
-  mutate(FinUSD = FinUSD/1000) %>%
+  .[, c(16:21, 1:15)] %>%
   # log+1 transform the data
-  mutate_at(vars('FinUSD', 'ChondLand', 'FishProd', 'totalGearTonnes', 'PprodMean',
-                 'CoastPop', 'CoastLength', 'EstDis', 'ProteinDiet', 'GDP', 
-                 'Iuu', 'Mang', 'ChondCatch'), log1p) %>%
-  dplyr::rename('logFinUSD' = 'FinUSD',
-                'logChondLand' = 'ChondLand',
-                'logFishProd' = 'FishProd',
-                'logtotalGearTonnes' = 'totalGearTonnes',
+  mutate_at(vars('totalGearTonnes', 'PprodMean', 'CoastPop', 'CoastLength', 
+                 'EstDis', 'ProteinDiet', 'GDP', 'Mang', 'ChondCatch'), log1p) %>%
+  dplyr::rename('logtotalGearTonnes' = 'totalGearTonnes',
                 'logPprodMean' = 'PprodMean',
                 'logCoastPop' = 'CoastPop',
                 'logCoastLength' = 'CoastLength', 
                 'logEstDis' = 'EstDis', 
                 'logProteinDiet' = 'ProteinDiet', 
-                'logGDP' = 'GDP', 
-                'logIuu' = 'Iuu', 
+                'logGDP' = 'GDP',
                 'logMang' = 'Mang',
                 'logChondCatch' = 'ChondCatch')
 
-write.csv(ddProc, 'ProcessedDataDeficients_181214.csv')
+write.csv(ddProc, 'ProcessedDataDeficients_190208.csv')
