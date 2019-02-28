@@ -2,7 +2,9 @@
 
 library(tidyverse)
 library(countrycode)
-setwd('/users/helenyan/desktop/school/directed studies 2018/datasets')
+library(broom)
+
+setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/')
 
 # ---------------------------------------------------------------------------------------------------
 # Number of individuals lost from a single country etc. ---------------------------------------------
@@ -62,6 +64,21 @@ changespp <-
   left_join(., lost, by = c('ISO3' = 'ISO3')) %>% 
   drop_na()
 
+head(changespp)
+
+# turn changespp into df for GIS maps
+changespp2 <- 
+  hist %>% 
+  left_join(., lost, by = c('ISO3' = 'ISO3')) %>% 
+  mutate(change = present - hist) %>% 
+  mutate_all(funs(replace(., is.na(.), 'unknown')))
+
+nrow(changespp2)
+head(changespp2)
+
+lapply(changespp2, function(x) sum(is.na(x)))
+
+write.csv(changespp2, 'Publication Maps/SpeciesChange_190226.csv')
 
 # countries where sawfishes are completely extinct 
 allextinct <- 
@@ -89,7 +106,9 @@ morelost <-
   somepres %>% 
   filter(change != -1)
 
-# data-deficients -----------------------------------------------
+# ---------------------------------------------------------------------------------------------------
+# Data-deficient countries --------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------
 dd <- 
   allspp %>%
   dplyr::filter(presence == 'unknown') %>% 
@@ -120,3 +139,39 @@ singleunknown <-
   filter(change != 0)
 
 nrow(singleunknown)
+
+# Make GIS dataframe for the number of unknown species 
+ddMap <- 
+  changespp %>% 
+  # join to other dataframe to get all 91 countries in list
+  left_join(., unknown, by = c('ISO3' = 'ISO3')) %>% 
+  select(-hist.x, -present, -change, -hist.y) %>% 
+  rename(noDDspp = nospp) %>% 
+  mutate_all(funs(replace(., is.na(.), 0)))
+
+head(ddMap)
+write.csv(ddMap, 'Publication Maps/SpeciesDataDeficients_190227.csv')
+
+
+# ---------------------------------------------------------------------------------------------------
+# Predictions ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------
+
+predsraw <- read_csv('GBMPredictedMeans_190122.csv')
+
+preds <- 
+  predsraw %>% 
+  select(-X1) %>% 
+  # join to other dataframe to get all 91 countries in list
+  right_join(., changespp, by = c('ISO3' = 'ISO3')) %>% 
+  select(-hist, -present) %>% 
+  rename(probPresent = value) %>% 
+  mutate(probExtinct = 1 - probPresent) %>% 
+  mutate(bins = cut(probPresent, breaks = seq(0, 1, 0.2))) %>% 
+  mutate(bins = as.vector(bins)) %>% 
+  mutate_at('bins', funs(replace(., is.na(.), 'known')))
+
+head(preds)
+nrow(preds)
+
+write.csv(preds, 'Publication Maps/SpeciesPredictions_190227.csv')
