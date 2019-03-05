@@ -603,9 +603,6 @@ olddf <- lapply(old, read_csv)
 new <- list.files(pattern = "GBMResults2*")
 newdf <- lapply(new, read_csv)
 
-#vars1 <- sub('GBMResults2', '', new) 
-#vars <- sub('_190130.csv', '', vars1)
-
 dfs <- list()
 for(i in 1:20) {
   
@@ -626,4 +623,36 @@ for(i in 1:20) {
   
 }
 
-, 'lowerci', 'upperci', 'totalsd', 'totaln', 'totalse'
+
+# SAU Sawfish landings --------------------------------------------------------------------
+setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/SAUSawfishLandings/')
+library(countrycode)
+library(tidyverse)
+
+sawlandraw <- read_csv('SAUSawfishLandingsRaw.csv')
+
+sawland <- 
+  sawlandraw %>% 
+  select(area_name, year, fishing_sector, catch_type, 
+         reporting_status, gear_type, end_use_type, tonnes, landed_value) %>% 
+  mutate(ISO3 = countrycode(area_name, 'country.name', 'iso3c')) %>% 
+  mutate(ISO3 = case_when(area_name == 'USA (Gulf of Mexico)' ~ 'USA',
+                          area_name == 'Iran (Sea of Oman)' ~ 'IRN',
+                          TRUE ~ as.character(ISO3))) %>% 
+  # sum the catch per country per year regardless of use or catch type
+  group_by(ISO3, year) %>% 
+  summarise(mean_tonnes = mean(tonnes),
+            mean_value = mean(landed_value))
+    #        n = n(),
+    #        sd_tonnes = sd(tonnes),
+    #        sd_value = sd(landed_value),
+    #        se_tonnes = sd(tonnes)/sqrt(n),
+    #        se_value = sd(landed_value)/sqrt(n))
+
+head(sawland)
+View(sawland)
+
+ggplot(sawland, aes(x = year, y = mean_tonnes, colour = ISO3)) +
+  geom_point() +
+  geom_line()
+
