@@ -27,10 +27,12 @@ raw <- read_csv('ProcessedCovariates_190119.csv')
 
 dat <- 
   raw %>% 
-  select(2, 9:28) %>% 
+  dplyr::select(ISO3, logtotalGearTonnes, logPprodMean, NBI,
+               logCoastPop, logCoastLength, logEstDis, logProteinDiet,
+               logGDP, HDI, OHI, logMang, WGI, logChondCatch, SstMean,
+               logFishProd, logIuu) %>% 
   distinct(ISO3, .keep_all = TRUE) %>% 
-  select(-ISO3) %>% 
-  select(-ReefFishers, -EPI)
+  dplyr::select(-ISO3)
   
 sapply(dat, function(x) sum(is.na(x)))
 
@@ -65,8 +67,8 @@ corfig <-
                               'logPprodMean' = 'Primary Productivity (PPD)',
                               'logFinUSD' = 'Fin Exports (FXP)',
                               'logCoastPop' = 'Coastal Population (CTP)',
-                              'logChondLand' = 'Chondrichthyes Landings (CHL)',
-                              'SstMean' = 'Sea Surface Temperature (°C; SST)',
+                              #'logChondLand' = 'Chondrichthyes Landings (CHL)',
+                              'SstMean' = 'Sea Surface Temperature (SST)',
                               'logMang' = 'Mangrove Area (MNG)',
                               'HDI' = 'Human Development Index (HDI)',
                               #'EPI' = 'Environmental Performance Index (EPI)',
@@ -75,9 +77,9 @@ corfig <-
                               'NBI' = 'National Biodiversity Index (NBI)',
                               'logIuu' = 'Illegal Unreported and Unregulated Fishing (IUU)',
                               'logGDP' = 'Gross Domestic Product (GDP)',
-                              'logCoastLength' = 'Coastline length (km; CLL)',
-                              'logProteinDiet' = 'Marine Protein Supply (MPS)',
-                              'logtotalGearTonnes' = 'Fishing Gear Landed Tonnes (FGT)',
+                              'logCoastLength' = 'Coastline length (CLL)',
+                              'logProteinDiet' = 'Marine Protein Consumption (MPC)',
+                              'logtotalGearTonnes' = 'Gear-Restricted Landed Tonnes (GLT)',
                               #'ReefFishers' = 'Reef Fishers (RFF)',
                               'logFishProd' = 'Marine Fisheries Production (MFP)',
                               'logChondCatch' = 'Chondrichthyes Catches (CHC)')) %>%
@@ -85,7 +87,7 @@ corfig <-
                               'logPprodMean' = 'PPD',
                               'logFinUSD' = 'FXP',
                               'logCoastPop' = 'CTP',
-                              'logChondLand' = 'CHL',
+                              #'logChondLand' = 'CHL',
                               'SstMean' = 'SST',
                               'logMang' = 'MNG',
                               'HDI' = 'HDI',
@@ -96,8 +98,8 @@ corfig <-
                               'logIuu' = 'IUU',
                               'logGDP' = 'GDP',
                               'logCoastLength' = 'CLL',
-                              'logProteinDiet' = 'MPS',
-                              'logtotalGearTonnes' = 'FGT',
+                              'logProteinDiet' = 'MPC',
+                              'logtotalGearTonnes' = 'GLT',
                               #'ReefFishers' = 'RFF',
                               'logFishProd' = 'MFP',
                               'logChondCatch' = 'CHC')) %>%
@@ -107,23 +109,27 @@ corfig <-
   ggplot(., aes(x = Var1, y = Var2, fill = value)) +
   geom_tile(colour = 'white') +
   scale_fill_gradient2(high = 'red', low = 'blue', mid = 'white',
-                      midpoint = 0, limit = c(-1, 1), space = 'Lab',
-                      name = 'Pearson\nCorrelation') +
+                      midpoint = 0, limit = c(-1, 1), space = 'Lab') +
+                      #name = 'Pearson\nCorrelation') +
   coord_fixed() +
   geom_text(aes(x = Var1, y = Var2, label = value), colour = 'black', size = 3) +
   theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                    size = 12, hjust = 1),
-        legend.justification = c(1, 0),
-        legend.position = c(0.95, 0.85),
-        legend.direction = 'horizontal') +
+        legend.position = 'none') +
+        #legend.justification = c(1, 0),
+        #legend.position = c(0.95, 0.85),
+        #legend.direction = 'horizontal') +
   guides(fill = guide_colourbar(barwidth = 7, barheight = 1,
                                 title.position = 'top', title.hjust = 0.5)) +
-  labs(title = 'Correlation Heatmap', 
+  labs(title = '', 
        y = ' ',
        x = ' ') +
   presentation_theme()
 
 print(corfig)
+
+ggsave('../Figures/Publication/CorHeatMap_190213.pdf', corfig,
+       height = 19.05, width = 30.59, units = c('cm'))
 
 #  -----------------------------------------------------------------
 #  Partial dependence plots ----------------------------------------
@@ -513,4 +519,3 @@ longdfs <-
 fish <- 
   longdfs %>% 
   filter(category == 'fishing')
-
