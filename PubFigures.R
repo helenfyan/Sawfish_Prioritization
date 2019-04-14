@@ -172,17 +172,21 @@ library(facetscales)
 library(gridExtra)
 library(grid)
 
-pdp_theme <- function(axis_text_size = 13, axis_y_ticks = element_line()) {
+pdp_theme <- 
+  function(axis_text_size = 13, axis_y_ticks = element_line()) {
   theme(panel.background = element_blank(),
         axis.line.y = element_line(colour = 'grey60'),
         axis.line.x = element_line(colour = 'grey60'),
-        axis.text.y = element_text(size = axis_text_size, colour = 'grey20'),
+        axis.text.y = element_text(size = axis_text_size, 
+                                   colour = 'grey20'),
         axis.text.x = element_text(colour = 'grey20', size = 13),
         axis.ticks.y = axis_y_ticks,
-        axis.title = element_text(size = 20, colour = 'grey20'),
+        axis.title = element_text(size = 20, 
+                                  colour = 'grey20'),
         strip.text = element_blank(),
         panel.spacing = unit(0, 'lines'),
-        panel.border = element_rect(colour = 'grey60', size = 1, fill = NA))
+        panel.border = element_rect(colour = 'grey60', 
+                                    size = 1, fill = NA))
 }
 
 # try for pressures -----------------------
@@ -191,11 +195,18 @@ land <- dfs[[10]]
 catch <- dfs[[2]]
 pop <- dfs[[4]] 
 
+#long_fun <- function(x) {
+#  x %>% 
+#    dplyr::select(-X) %>% 
+#    gather(variable, stdvalue, 1) %>% 
+#    mutate_at(vars(stdvalue), funs(scale(.)))
+#}
+
 long_fun <- function(x) {
   x %>% 
     dplyr::select(-X) %>% 
     gather(variable, stdvalue, 1) %>% 
-    mutate_at(vars(stdvalue), funs(scale(.)))
+    mutate_at(vars(stdvalue), list(~ scale(.)))
 }
 
 fishpressures <- list(diet, land, catch, pop) %>% 
@@ -224,20 +235,29 @@ fishscales <- list(
                                      breaks = seq(0.36, 0.4, 0.04))
 )
 
+fishrug <- c(0.15, 0.2, 0.34, 0.35)
+
 fishtitle <- 
   data.frame(
-    label = c('a) Marine protein consumption', 'b) Gear-restricted landings',
-              'c) Chondrichthyes landings', 'd) Coastal population'),
-    variable = c('logProteinDiet', 'logtotalGearTonnes', 'logChondCatch', 'logCoastPop'),
+    label = c('a) Marine protein consumption', 
+              'b) Gear-restricted landings',
+              'c) Chondrichthyes landings', 
+              'd) Coastal population'),
+    variable = c('logProteinDiet', 
+                 'logtotalGearTonnes', 
+                 'logChondCatch', 
+                 'logCoastPop'),
     x = c(-1, -1.1, -1.09, -1.26),
     y = c(0.7, 0.6, 0.43, 0.43)
   )
+
 
 fish <- 
   ggplot(finalfish_f, aes(x = stdvalue, y = totmean)) +
   geom_ribbon(aes(ymin = totmin, ymax = totmax),
               alpha = 0.6, fill = 'dodgerblue') +
   geom_line(size = 1) +
+  geom_rug(sides = 'b') +
   #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y')
   facet_grid_sc(rows = vars(variable), space = 'free_y', 
                 scales = list(y = fishscales)) +
@@ -249,6 +269,31 @@ fish <-
 print(fish)
 
 
+fishscales_test <- list(
+  'logProteinDiet' = scale_y_continuous(limits = c(0.15, 0.7),
+                                        breaks = seq(0.1, 0.7, 0.1)),
+  'logtotalGearTonnes' = scale_y_continuous(limits = c(0.2, 0.6), 
+                                            breaks = seq(0.2, 0.6, 0.1)),
+  'logChondCatch' = scale_y_continuous(limits = c(0.2, 0.45),
+                                       breaks = seq(0.30, 0.42, 0.06)),
+  'logCoastPop' = scale_y_continuous(limits = c(0.2, 0.45),
+                                     breaks = seq(0.30, 0.4, 0.04))
+)
+
+test_fish <- 
+  ggplot(finalfish_f, aes(x = stdvalue, y = totmean)) +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax),
+              alpha = 0.6, fill = 'dodgerblue') +
+  geom_line(size = 1) +
+  geom_rug(sides = 'b') +
+  #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y')
+  facet_grid_sc(rows = vars(variable), space = 'free_y',
+                scales = list(y = fishscales_test)) +
+  pdp_theme() +
+  labs(x = '', y = 'Marginal Effect on Occurrence') +
+  theme(plot.margin = unit(c(0.1, 0, -0.5, 1), 'cm'))
+
+print(test_fish)
 
 # try for management -----------------------
 ohi <- dfs[[13]]
@@ -519,3 +564,97 @@ longdfs <-
 fish <- 
   longdfs %>% 
   filter(category == 'fishing')
+
+
+
+# ------------------------------------------------------------------
+# Sawfish Search Figure --------------------------------------------
+# ------------------------------------------------------------------
+searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_190312.csv')
+searchCoord <- read_csv('../SawfishSearchCountriesComplete_190414.csv')
+
+# want long style where twe have a study type in the country - size of the dot
+# corresponding to the number of studies done in the area
+
+searchClean <- 
+  searchRaw %>% 
+  # remove species from further analyses
+  # also remove reference IDs, citation, notes, and year
+  select(-species1:-species5, -citation, -notes, -year) %>% 
+  # gather the different survey types
+  gather(key = key, value = method, method1:method4) %>% 
+  # gather the different countries now
+  gather(key = key, value = country, country1:country25) %>% 
+  select(-key) %>% 
+  drop_na() %>% 
+  mutate(method = gsub(' ', '_', method)) %>% 
+  mutate(method = recode(method,
+                         'fisheries' = 'Bather Protection Nets & Fisheries',
+                         'bather_net' = 'Bather Protection Nets & Fisheries',
+                         'collection' = 'Museum Records',
+                         'museum' = 'Museum Records',
+                         'media' = 'Media Reports',
+                         'historical_data' = 'Media Reports',
+                         'direct_survey' = 'Literature & Expert Advice',
+                         'encounter_data' = 'Literature & Expert Advice',
+                         'literature' = 'Literature & Expert Advice',
+                         'expert' = 'Literature & Expert Advice',
+                         'photo' = 'Photographs',
+          'fishers_ecological_knowledge' = "Fishers' Ecological Knowledge")) %>% 
+  group_by(country, method) %>% 
+  summarise(total = n()) %>% 
+  left_join(searchCoord, by = c('country' = 'country'))
+  
+
+unique(searchClean$method)
+
+# make a dataframe of the countries 
+#searchCountries <- 
+#  searchClean %>% 
+#  select(country) %>% 
+#  distinct(country, .keep_all = TRUE)
+
+#write.csv(searchCountries, '../SawfishSearchCountriesEmpty_190414.csv')
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+
+world <- 
+  ne_countries(scale = 'medium',
+               type = 'countries',
+               returnclass = 'sf') %>% 
+  dplyr::filter(continent != 'Antarctica')
+
+methodsMap <- 
+  ggplot(data = world) +
+  geom_sf(fill = 'grey75', color = 'grey80', size = 0.2) +
+  #geom_sf(fill = 'grey25', color = 'grey30', size = 0.2) +
+  geom_point(data = searchClean, 
+             aes(x = long, y = lat,
+                 colour = method,
+                 size = total),
+             alpha = 0.5) +
+  scale_size(range = c(4, 14)) +
+  theme(panel.background = element_blank(),
+        panel.border = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        legend.key = element_blank(),
+        legend.background = element_rect(fill = 'white'),
+        legend.position = c(0.17, 0.25),
+        legend.text = element_text(size = 11),
+        legend.title = element_text(size = 13)) +
+  guides(size = FALSE,
+         colour = guide_legend(override.aes = list(size = 6))) +
+  labs(colour = 'Method')
+
+ggsave('../../Figures/Publication/MapMethods_190414.pdf', methodsMap, 
+       height = 19.05, width = 30.58, units = c('cm'))
+  
+
+
+
+
+
+
+  
