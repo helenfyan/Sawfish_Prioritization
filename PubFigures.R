@@ -174,7 +174,8 @@ library(grid)
 
 pdp_theme <- 
   function(axis_text_size = 13, axis_y_ticks = element_line()) {
-  theme(panel.background = element_blank(),
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
         axis.line.y = element_line(colour = 'grey60'),
         axis.line.x = element_line(colour = 'grey60'),
         axis.text.y = element_text(size = axis_text_size, 
@@ -257,7 +258,6 @@ fish <-
   geom_ribbon(aes(ymin = totmin, ymax = totmax),
               alpha = 0.6, fill = 'dodgerblue') +
   geom_line(size = 1) +
-  geom_rug(sides = 'b') +
   #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y')
   facet_grid_sc(rows = vars(variable), space = 'free_y', 
                 scales = list(y = fishscales)) +
@@ -268,32 +268,6 @@ fish <-
 
 print(fish)
 
-
-fishscales_test <- list(
-  'logProteinDiet' = scale_y_continuous(limits = c(0.15, 0.7),
-                                        breaks = seq(0.1, 0.7, 0.1)),
-  'logtotalGearTonnes' = scale_y_continuous(limits = c(0.2, 0.6), 
-                                            breaks = seq(0.2, 0.6, 0.1)),
-  'logChondCatch' = scale_y_continuous(limits = c(0.2, 0.45),
-                                       breaks = seq(0.30, 0.42, 0.06)),
-  'logCoastPop' = scale_y_continuous(limits = c(0.2, 0.45),
-                                     breaks = seq(0.30, 0.4, 0.04))
-)
-
-test_fish <- 
-  ggplot(finalfish_f, aes(x = stdvalue, y = totmean)) +
-  geom_ribbon(aes(ymin = totmin, ymax = totmax),
-              alpha = 0.6, fill = 'dodgerblue') +
-  geom_line(size = 1) +
-  geom_rug(sides = 'b') +
-  #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y')
-  facet_grid_sc(rows = vars(variable), space = 'free_y',
-                scales = list(y = fishscales_test)) +
-  pdp_theme() +
-  labs(x = '', y = 'Marginal Effect on Occurrence') +
-  theme(plot.margin = unit(c(0.1, 0, -0.5, 1), 'cm'))
-
-print(test_fish)
 
 # try for management -----------------------
 ohi <- dfs[[13]]
@@ -318,11 +292,16 @@ finalmanage_f <-
 
 manscales <- 
   list(
-    'OHI' = scale_y_continuous(limits = c(0.3, 0.5), breaks = seq(0.3, 0.45, 0.05)),
-    'NBI' = scale_y_continuous(limits = c(0.32, 0.5), breaks = seq(0.35, 0.45, 0.05)),
-    'HDI' = scale_y_continuous(limits = c(0.32, 0.45), breaks = seq(0.36, 0.42, 0.06)),
-    'WGI' = scale_y_continuous(limits = c(0.32, 0.5), breaks = seq(0.35, 0.45, 0.05)),
-    'logGDP' = scale_y_continuous(limits = c(0.3, 0.45), breaks = seq(0.32, 0.4, 0.08))
+    'OHI' = scale_y_continuous(limits = c(0.3, 0.5), 
+                               breaks = seq(0.3, 0.45, 0.05)),
+    'NBI' = scale_y_continuous(limits = c(0.32, 0.5), 
+                               breaks = seq(0.35, 0.45, 0.05)),
+    'HDI' = scale_y_continuous(limits = c(0.32, 0.45), 
+                               breaks = seq(0.36, 0.42, 0.06)),
+    'WGI' = scale_y_continuous(limits = c(0.32, 0.5), 
+                               breaks = seq(0.35, 0.45, 0.05)),
+    'logGDP' = scale_y_continuous(limits = c(0.3, 0.45), 
+                                  breaks = seq(0.32, 0.4, 0.08))
   )
 
 mantitle <- 
@@ -338,7 +317,7 @@ mantitle <-
 man <- 
   ggplot(finalmanage_f, aes(x = stdvalue, y = totmean)) +
   geom_ribbon(aes(ymin = totmin, ymax = totmax),
-              alpha = 0.6, fill = 'deeppink4') +
+              alpha = 0.6, fill = 'deeppink3') +
   geom_line(size = 1) +
   facet_grid_sc(rows = vars(variable), space = 'free_y', scales = list(y = manscales)) +
   pdp_theme() +
@@ -385,9 +364,11 @@ ecoscales <- list(
 
 ecotitle <- 
   data.frame(
-    label = c('j) Coastline length', 'k) Mangrove cover', 'l) Estuaries discharge rate',
+    label = c('j) Coastline length', 'k) Mangrove cover', 
+              'l) Estuaries discharge rate',
               'm) Primary productivity', 'n) Sea surface temperature'),
-    variable = c('logCoastLength', 'logMang', 'logEstDis', 'logPprodMean', 'SstMean'),
+    variable = c('logCoastLength', 'logMang', 'logEstDis', 
+                 'logPprodMean', 'SstMean'),
     x = c(-1.02, -1.02, -0.7, -0.85, -0.65),
     y = c(0.8, 0.59, 0.59, 0.46, 0.46)
   )
@@ -412,7 +393,7 @@ allstd <- grid.arrange(fish, man, ecology, ncol = 3,
                                gp = gpar(fontsize = 18, col = 'grey20'), 
                                vjust = 1e-5, hjust = 0.35))
 
-ggsave('../../Figures/Publication/UnlabelledPDPstd_190206.pdf', allstd,
+ggsave('../../Figures/Publication/UnlabelledPDPstd_190414.pdf', allstd,
        height = 19.05, width = 30.59, units = c('cm'))
 
 
@@ -519,54 +500,6 @@ ggsave('../../Figures/Publication/UnlabelledPDP_190207.pdf', allplots,
 
 
 
-
-dfslong <- 
-  lapply(figs, function(x) {
-    df <- read.csv(x) %>% 
-      dplyr::select(-1) %>% 
-      gather(variable, value, 1)
-    
-    return(df)
-  })
-
-alldfs <- data.frame()
-for(i in 1:20) {
-  datf <- dfs[[i]]
-  alldfs <- rbind(alldfs, datf)
-}
-
-longdfs <- 
-  alldfs %>% 
-  dplyr::filter(variable != 'occurrence' |
-                variable != 'speciesdwarf' |
-                variable != 'specieslarge' |
-                variable != 'speciesgreen' |
-                variable != 'speciessmall' |
-                variable != 'speciesnarrow') %>% 
-  mutate(category = case_when(variable == 'HDI' ~ 'management',
-                              variable == 'logGDP' ~ 'management',
-                              variable == 'NBI' ~ 'management',
-                              variable == 'OHI' ~ 'management',
-                              variable == 'WGI' ~ 'management',
-                              variable == 'logChondCatch' ~ 'fishing',
-                              variable == 'logCoastPop' ~ 'fishing',
-                              variable == 'logProteinDiet' ~ 'fishing',
-                              variable == 'logtotalGearTonnes' ~ 'fishing',
-                              variable == 'logCoastLength' ~ 'ecology',
-                              variable == 'logEstDis' ~ 'ecology',
-                              variable == 'logMang' ~ 'ecology',
-                              variable == 'logPprodMean' ~ 'ecology',
-                              variable == 'SstMean' ~ 'ecology'))
-
-
-# fishing pressures ---------------------------------
-
-fish <- 
-  longdfs %>% 
-  filter(category == 'fishing')
-
-
-
 # ------------------------------------------------------------------
 # Sawfish Search Figure --------------------------------------------
 # ------------------------------------------------------------------
@@ -650,11 +583,63 @@ methodsMap <-
 
 ggsave('../../Figures/Publication/MapMethods_190414.pdf', methodsMap, 
        height = 19.05, width = 30.58, units = c('cm'))
-  
 
 
+# ------------------------------------------------------------------
+# Density plots ----------------------------------------------------
+# ------------------------------------------------------------------
+
+covs_raw <- read_csv('../GBMtrain_190119.csv')
+
+covs <- 
+  covs_raw %>% 
+  select(-X1, -speciesdwarf, -speciesgreen, -specieslarge, -speciesnarrow,
+         -speciessmall, -occurrence, -logFinUSD) %>% 
+  rename('log Gear-specific landings' = 'logtotalGearTonnes',
+         'log Primary productivity' = 'logPprodMean',
+         'log Coastal population' = 'logCoastPop',
+         'log Coastline length' = 'logCoastLength',
+         'log Estuaries discharge rate' = 'logEstDis',
+         'log Marine protein consumption' = 'logProteinDiet',
+         'log GDP' = 'logGDP',
+         'log Mangrove area' = 'logMang',
+         'log Chondrichthyan landings' = 'logChondCatch',
+         'Sea surface temperature' = 'SstMean') %>% 
+  gather(key = variable)
 
 
+hist_plot <- 
+  lapply(unique(covs$variable), function(x) {
+    
+    make_plot <- 
+      covs %>% 
+      filter(variable == x) %>% 
+      ggplot(., aes(value)) +
+      geom_density(fill = 'grey80', alpha = 0.6, colour = 'grey30') +
+      labs(x = paste(x), y = '') +
+      theme(axis.line.y = element_line(colour = 'grey60'),
+            axis.line.x = element_line(colour = 'grey60'),
+            axis.text.y = element_text(size = 11, colour = 'grey20'),
+            axis.text.x = element_text(size = 11, colour = 'grey20'),
+            axis.ticks.y = element_line(),
+            axis.title = element_text(size = 14, colour = 'grey20'))
+    
+    return(make_plot)
+    
+  })
 
 
-  
+dens_plots <- 
+  grid.arrange(hist_plot[[1]], hist_plot[[2]], 
+               hist_plot[[3]], hist_plot[[4]],
+               hist_plot[[5]], hist_plot[[6]],
+               hist_plot[[7]], hist_plot[[8]],
+               hist_plot[[9]], hist_plot[[10]],
+               hist_plot[[11]], hist_plot[[12]],
+               hist_plot[[13]], hist_plot[[14]],
+               nrow = 4, left = grid::textGrob('Density',
+                                rot = 90, 
+                                gp = gpar(fontsize = 16, col = 'grey20')))
+
+ggsave('../../Figures/Publication/SOMDensity_190414.pdf', dens_plots,
+       height = 19.05, width = 30.58, units = c('cm'))
