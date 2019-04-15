@@ -504,7 +504,8 @@ ggsave('../../Figures/Publication/UnlabelledPDP_190207.pdf', allplots,
 # Sawfish Search Figure --------------------------------------------
 # ------------------------------------------------------------------
 searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_190312.csv')
-searchCoord <- read_csv('../SawfishSearchCountriesComplete_190414.csv')
+searchCoord <- 
+  read_csv('../../../Datasets/SawfishSearchCountriesComplete_190414.csv')
 
 # want long style where twe have a study type in the country - size of the dot
 # corresponding to the number of studies done in the area
@@ -521,6 +522,8 @@ searchClean <-
   select(-key) %>% 
   drop_na() %>% 
   mutate(method = gsub(' ', '_', method)) %>% 
+  # filter out eDNA and direct survey
+  dplyr::filter(!method %in% c('direct_survey', 'eDNA')) %>% 
   mutate(method = recode(method,
                          'fisheries' = 'Bather Protection Nets & Fisheries',
                          'bather_net' = 'Bather Protection Nets & Fisheries',
@@ -528,7 +531,7 @@ searchClean <-
                          'museum' = 'Museum Records',
                          'media' = 'Media Reports',
                          'historical_data' = 'Media Reports',
-                         'direct_survey' = 'Literature & Expert Advice',
+                         #'direct_survey' = 'Literature & Expert Advice',
                          'encounter_data' = 'Literature & Expert Advice',
                          'literature' = 'Literature & Expert Advice',
                          'expert' = 'Literature & Expert Advice',
@@ -581,7 +584,7 @@ methodsMap <-
          colour = guide_legend(override.aes = list(size = 6))) +
   labs(colour = 'Method')
 
-ggsave('../../Figures/Publication/MapMethods_190414.pdf', methodsMap, 
+ggsave('../../../Figures/Publication/Maps/MapMethods_190416.pdf', methodsMap, 
        height = 19.05, width = 30.58, units = c('cm'))
 
 
