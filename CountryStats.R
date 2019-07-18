@@ -10,7 +10,7 @@ setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/')
 # Number of individuals lost from a single country etc. ---------------------------------------------
 # ---------------------------------------------------------------------------------------------------
 
-allsppraw <- read_csv('SawfishOccurrence_181015.csv')
+allsppraw <- read_csv('../../../Datasets/SawfishOccurrence_181015.csv')
 
 allspp <- 
   allsppraw %>% 
@@ -25,60 +25,54 @@ allspp <-
   mutate(nosppHist = 1) %>% 
   mutate(nosppNow = case_when(presence == 'present' ~ 1,
                               presence == 'absent' ~ 0,
-                              presence == 'unknown' ~ 10))
+                              presence == 'unknown' ~ 10)) %>% 
+  # duplicates removal
+  mutate(refid = paste(species, ISO3, presence, sep = '_')) %>% 
+  distinct(refid, .keep_all = TRUE)
 
 head(allspp)
 lapply(allspp, function(x) sum(is.na(x)))
 
-# number of countries which had sawfish ----------------------------
-# this includes Taiwan and Viet Nam separately 
-allcountries <- 
-  allspp %>% 
-  distinct(ISO3, .keep_all = TRUE)
 
-nrow(allcountries)
-
-# number of species currently in each country ---------------------
-
-# number of countries which have lost species ---------------------
-# historial number in each country
+# historical distribution of sawfishes
 hist <- 
-  allspp %>%
+  allspp %>% 
   group_by(ISO3) %>% 
-  summarise(hist = sum(nosppHist))
+  summarise(hist_spp = sum(nosppHist))
 
-head(hist)
-
-# number of species lost
-lost <-
+# number of species still present 
+pres_still <- 
   allspp %>% 
   dplyr::filter(presence != 'unknown') %>% 
   group_by(ISO3) %>% 
-  summarise(present = sum(nosppNow))
+  summarise(present_spp = sum(nosppNow))
 
-head(lost)
-
-# change in species 
-changespp <- 
-  hist %>%
-  left_join(., lost, by = c('ISO3' = 'ISO3')) %>% 
-  drop_na()
-
-head(changespp)
-
-# turn changespp into df for GIS maps
-changespp2 <- 
+# species lost
+lost <- 
   hist %>% 
-  left_join(., lost, by = c('ISO3' = 'ISO3')) %>% 
-  mutate(change = present - hist) %>% 
-  mutate_all(funs(replace(., is.na(.), 'unknown')))
+  left_join(., pres_still, by = c('ISO3' = 'ISO3')) %>% 
+  mutate(lost = hist_spp - present_spp)
 
-nrow(changespp2)
-head(changespp2)
+# number of unknowns
+unknwn <- 
+  allspp %>% 
+  dplyr::filter(presence == 'unknown') %>% 
+  group_by(ISO3) %>% 
+  summarise(unknown_spp = sum(nosppHist))
 
-lapply(changespp2, function(x) sum(is.na(x)))
+# join columns together to make one dataframe
+spp_change <- 
+  lost %>%
+  left_join(., unknwn, by = c('ISO3', 'ISO3')) %>% 
+  # replace all NAs with zeros
+  mutate_all(funs(replace(., is.na(.), 0)))
 
-write.csv(changespp2, 'Publication Maps/SpeciesChange_190226.csv')
+
+lapply(spp_change, function(x) sum(is.na(x)))
+
+write_csv(spp_change, '../../../Datasets/Publication Maps/SpeciesChange_190718.csv')
+
+# more random stats -------------------------------------------------------
 
 # countries where sawfishes are completely extinct 
 allextinct <- 
@@ -104,7 +98,8 @@ onelost <-
 # more than one species lost 
 morelost <- 
   somepres %>% 
-  filter(change != -1)
+  filter(change != -1) %>% 
+  mutate(country = countrycode(ISO3, 'iso3c', 'country.name'))
 
 # ---------------------------------------------------------------------------------------------------
 # Data-deficient countries --------------------------------------------------------------------------
@@ -157,7 +152,7 @@ write.csv(ddMap, 'Publication Maps/SpeciesDataDeficients_190227.csv')
 # Predictions ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------
 
-predsraw <- read_csv('GBMPredictedMeans_190122.csv')
+predsraw <- read_csv('../../../Datasets/GBMPredictedMeans_190122.csv')
 
 preds <- 
   predsraw %>% 
@@ -175,3 +170,56 @@ head(preds)
 nrow(preds)
 
 write.csv(preds, 'Publication Maps/SpeciesPredictions_190227.csv')
+
+
+# ---------------------------------------------------------------------------------------------------
+# Predictions with ranges ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------
+
+preds2 <- read_csv('GBMPredicted_190208.csv')
+
+predsRange <- 
+  preds2 %>%
+  select(-X1) %>% 
+  rename(value = '.') %>% 
+  group_by(ISO3) %>% 
+  summarise(predmean = mean(value),
+            predmax = max(value),
+            predmin = min(value)) %>% 
+  mutate(country = countrycode(ISO3, 'iso3c', 'country.name')) %>% 
+  .[c(5, 1:4)]
+
+head(predsRange)
+nrow(predsRange)
+
+write.csv(predsRange, 'GBMPredictedRange_190305.csv')
+
+
+# ---------------------------------------------------------------------------------------------------
+# Predictions combined with known presence -------------------------------------------
+# ---------------------------------------------------------------------------------------------------
+
+knownPred <- 
+  allsppraw %>% 
+  mutate(country = gsub('Saint Vinctente and Grenadines', 
+                        'Saint Vincent and Grenadines', 
+                        country),
+         country = gsub('Domincia', 'Dominica', country)) %>% 
+  mutate(ISO3 = countrycode(country, 'country.name', 'iso3c')) %>% 
+  dplyr::filter(presence != 'unknown') %>% 
+  mutate(value = case_when(presence == 'present' ~ 1,
+                                presence == 'absent' ~ 0)) %>% 
+  select(-country, -region, -species, -presence) %>% 
+  arrange(desc(value)) %>% 
+  distinct(ISO3, .keep_all = TRUE) %>% 
+  mutate(X1 = 0) %>% 
+  rbind(predsraw) %>% 
+  select(-X1) %>% 
+  arrange(value) %>% 
+  distinct(ISO3, .keep_all = TRUE)
+
+head(knownPred)
+lapply(knownPred, function(x) sum(is.na(x)))
+View(knownPred)
+
+write_csv(knownPred, '../../../Datasets/Publication Maps/PredictionsWKnown_190510.csv')
