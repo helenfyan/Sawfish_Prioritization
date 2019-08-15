@@ -262,7 +262,7 @@ fish <-
   facet_grid_sc(rows = vars(variable), space = 'free_y', 
                 scales = list(y = fishscales)) +
   pdp_theme() +
-  labs(x = '', y = 'Marginal Effect on Occurrence') +
+  labs(x = '', y = 'Marginal Effect on Sawfish Occurrence') +
   theme(plot.margin = unit(c(0.1, 0, -0.5, 1), 'cm'))
   #geom_text(data = fishtitle, mapping = aes(x = x, y = y, label = label), size = 5)
 
@@ -389,13 +389,33 @@ ecology <-
 print(ecology)
 
 allstd <- grid.arrange(fish, man, ecology, ncol = 3, 
-             bottom = grid::textGrob('Standardized Value', 
+             bottom = grid::textGrob('Standardized Value of Explanatory Variable', 
                                gp = gpar(fontsize = 18, col = 'grey20'), 
                                vjust = 1e-5, hjust = 0.35))
 
-ggsave('../../Figures/Publication/UnlabelledPDPstd_190414.pdf', allstd,
+ggsave('../../Figures/Publication/UnlabelledPDPstd_190503.pdf', allstd,
        height = 19.05, width = 30.59, units = c('cm'))
 
+# write a csv file containing all of the pdp values 
+
+pdpDf <- 
+  rbind(finaleco_f, finalmanage_f, finalfish_f) %>% 
+  mutate(index = case_when(variable == 'logCoastLength' ~ 'ecology',
+                           variable == 'logMang' ~ 'ecology',
+                           variable == 'logEstDis' ~ 'ecology',
+                           variable == 'logPprodMean' ~ 'ecology',
+                           variable == 'SstMean' ~ 'ecology',
+                           variable == 'OHI' ~ 'management',
+                           variable == 'NBI' ~ 'management',
+                           variable == 'HDI' ~ 'management',
+                           variable == 'WGI' ~ 'management',
+                           variable == 'logGDP' ~ 'management',
+                           variable == 'logProteinDiet' ~ 'fishing',
+                           variable == 'logtotalGearTonnes' ~ 'fishing',
+                           variable == 'logChondCatch' ~ 'fishing',
+                           variable == 'logCoastPop' ~ 'fishing'))
+
+write_csv(pdpDf, '../GBMOutAllPdp_190815.csv')
 
 # ------------------------------------------------------------------------------
 # Trevor Branch's figures with unstandardized axes -----------------------------
@@ -498,6 +518,55 @@ print(allplots)
 ggsave('../../Figures/Publication/UnlabelledPDP_190207.pdf', allplots,
        height = 19.05, width = 30.58, units = c('cm'))
 
+# ------------------------------------------------------------------------------
+# PDP Figs with unscaled y axes ------------------------------------------------
+# ------------------------------------------------------------------------------
+
+pdp_raw <- read_csv('../GBMOutAllPdp_190815.csv')
+
+make_figure <- function(index_cat, index_colour) {
+  
+  plots <- 
+    pdp_raw %>% 
+    dplyr::filter(index == index_cat) %>% 
+    ggplot(., aes(x = stdvalue, y = totmean)) +
+    geom_ribbon(aes(ymin = totmin, ymax = totmax),
+                alpha = 0.6, fill = index_colour) +
+    geom_line(size = 1) +
+    facet_grid_sc(rows = vars(variable), space = 'fixed',
+                  labeller = vars(variable)) +
+    scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+    pdp_theme() +
+    labs(y = '', x = '') +
+    theme(plot.margin = unit(c(0.1, 0, -0.5, -0.05), 'cm'))
+  
+  return(plots)
+  
+}
+  
+
+eco <- make_figure('ecology', 'darkgreen')
+eco
+
+man <- make_figure('management', 'deeppink4')
+man
+
+fish <- make_figure('fishing', 'dodgerblue')
+fish
+
+
+all01 <- 
+  grid.arrange(fish, man, eco, ncol = 3,
+               bottom = grid::textGrob('Standardized Value of Explanatory Variable',
+                                       gp = gpar(fontsize = 18, col = 'grey20'),
+                                       vjust = 1e-5, hjust = 0.35),
+               left = grid::textGrob('Marginal Effect on Sawfish Occurrence',
+                                     gp = gpar(fontsize = 18, col = 'grey20'),
+                                     vjust = 0.7, hjust = 0.35, rot = 90))
+
+
+ggsave('../../Figures/UnlabelledPDP_190815.pdf', all01,
+       height = 19.05, width = 30.58, units = c('cm'))
 
 
 # ------------------------------------------------------------------
