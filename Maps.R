@@ -23,8 +23,8 @@ map_theme <- function(legendSpace = 0.2, legendText = 13) {
   
 }
 
-# make a dataframe for each species
-raw <- read_csv('CompleteSpeciesISO_180924.csv')
+
+raw <- read_csv('../../../Datasets/CompleteSpeciesISO_180924.csv')
 
 all <- 
   raw %>% 
@@ -33,6 +33,45 @@ all <-
                                   'absent' = 'Extinct',
                                   'unknown' = 'Presence Unknown'))
 
+# make a dataframe reassiging the predictions
+nPred <- 
+  raw %>% 
+  dplyr::select(country, ISO3, occurrence) %>% 
+  mutate(presence = case_when(occurrence == 1 ~ 'Present',
+                              occurrence == 0 ~ 'Extinct',
+                              occurrence == 2 & country == 'Singapore' ~ 'Extinct',
+                              occurrence == 2 & country == 'Japan' ~ 'Extinct',
+                              occurrence == 2 & country == 'El Salvador' ~ 'Extinct',
+                              occurrence == 2 & country == 'Thailand' ~ 'Extinct',
+                              occurrence == 2 & country == 'South Korea' ~ 'Extinct',
+                              occurrence == 2 & country == 'Brunei' ~ 'Extinct',
+                              occurrence == 2 & country == 'Cambodia' ~ 'Extinct',
+                              occurrence == 2 & country == 'Jamaica' ~ 'Extinct',
+                              occurrence == 2 & country == 'Guinea' ~ 'Extinct',
+                              occurrence == 2 & country == 'Taiwan' ~ 'Extinct',
+                              occurrence == 2 & country == 'Mexico' ~ 'Present',
+                              occurrence == 2 & country == 'Bangladesh' ~ 'Present',
+                              occurrence == 2 & country == 'Kenya' ~ 'Present',
+                              occurrence == 2 & country == 'Haiti' ~ 'Present',
+                              occurrence == 2 & country == 'Dominican Republic' ~ 'Present',
+                              occurrence == 2 & country == 'Somalia' ~ 'Present',
+                              occurrence == 2 & country == 'Bahamas' ~ 'Present',
+                              occurrence == 2 & country == 'Costa Rica' ~ 'Present',
+                              occurrence == 2 & country == 'Panama' ~ 'Present',
+                              occurrence == 2 & country == 'Cuba' ~ 'Present',
+                              occurrence == 2 & country == 'Madagascar' ~ 'Present',
+                              occurrence == 2 & country == 'Tanzania' ~ 'Present',
+                              occurrence == 2 & country == 'Solomon Islands' ~ 'Present',
+                              occurrence == 2 & country == 'Colombia' ~ 'Present',
+                              occurrence == 2 & country == 'Brazil' ~ 'Present')) %>% 
+  mutate_all(list(~ replace(., is.na(.), 'unknown'))) %>% 
+  arrange(desc(occurrence)) %>% 
+  distinct(ISO3, .keep_all = TRUE) %>% 
+  filter(country != 'Laos')
+
+write_csv(nPred, '../../../Datasets/MapReassignDD_190503.csv')
+
+# make a dataframe for each species
 large <- 
   all %>% 
   filter(species == 'large')

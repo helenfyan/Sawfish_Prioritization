@@ -1,0 +1,512 @@
+dfplot <-
+test %>%
+pdp::partial(pred.var = paste(x),
+grid.resolution = 102,
+n.trees = test$n.trees,
+prob = TRUE) %>%
+autoplot(rug = TRUE, train = sppData)
+theme_classic()
+print(dfplot)
+#dev.off()
+})
+summary(test, cBars = 10)
+sppData <-
+rawSpp %>%
+# remove collinear covariates
+dplyr::select(-X1, -ISO3, -logFishProd, -logIuu,
+-logChondLand, logFinUSD, -EPI, -ReefFishers, -logFinUSD) %>%
+as.data.frame()
+# need to randomize the data ---------------------------
+randomIndex <- sample(1:nrow(sppData), nrow(sppData))
+sppData <- sppData[randomIndex, ]
+# separate the data into training set (80%) and test set (20%) ------------------
+n <- nrow(sppData)
+ntrain <- round(0.8*n)
+trainIndex <- sample(1:n, ntrain)
+sppTrain <- sppData[trainIndex, ]
+sppTest <- sppData[-trainIndex, ]
+test <- gbm(formula = occurrence ~ .,
+distribution = 'bernoulli',
+data = sppTrain,
+n.trees = 5000,
+interaction.depth = 10,
+shrinkage = 0.001,
+bag.fraction = 0.5,
+n.minobsinnode = 5,
+cv.folds = 10,
+n.cores = NULL,
+verbose = FALSE)
+test
+summary(test, cBars = 10)
+testpred <- predict(object = test,
+newdata = sppTest,
+n.trees = 2400)
+auc1 <- auc(actual = sppTest$occurrence, predicted = testpred)
+print(auc1)
+pdpplots <-
+lapply(names(sppTrain), function(x) {
+#pdf(paste('initGBMout', x, '.pdf', sep = ''))
+dfplot <-
+test %>%
+pdp::partial(pred.var = paste(x),
+grid.resolution = 102,
+n.trees = test$n.trees,
+prob = TRUE) %>%
+autoplot(rug = TRUE, train = sppData)
+theme_classic()
+print(dfplot)
+#dev.off()
+})
+summary(test, cBars = 10)
+View(sppTrain)
+gbm.roc.area(sppTest$occurrence, testpred)
+library(maptools)
+library(broom)
+library(RColorBrewer)
+library(mapviews)
+library(mapview)
+worldmap <- map_data('world')
+worldmap <-
+worldmap %>%
+filter(region != 'Antarctica')
+?fortify
+worldmap <-
+worldmap %>%
+filter(region != 'Antarctica') %>%
+broom::tidy()
+head(worldmap)
+worldmap <-
+worldmap %>%
+filter(region != 'Antarctica') %>%
+broom::tidy(worldmap)
+worldmap <-
+worldmap %>%
+filter(region != 'Antarctica')
+glimpse(worldmap)
+str(worldmap)
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = 'white', colour = 'blue', size  0.5) +
+coord_fixed()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = 'white', colour = 'blue', size = 0.5) +
+coord_fixed()
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_text(size = legendText),
+legend.title = element_blank(),
+legend.spacing.x = unit(legendSpace, 'cm'),
+legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
+legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = 'grey80', colour = 'white', size = 0.5) +
+coord_fixed() +
+map_theme()
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+panel.grid = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_text(size = legendText),
+legend.title = element_blank(),
+legend.spacing.x = unit(legendSpace, 'cm'),
+legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
+legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+panel.grid = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_text(size = legendText),
+legend.title = element_blank(),
+legend.spacing.x = unit(legendSpace, 'cm'),
+legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
+legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = 'grey80', colour = 'white', size = 0.5) +
+coord_fixed() +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = 'grey70', colour = 'white', size = 0.5) +
+coord_fixed() +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = 'grey70', colour = '#080818', size = 0.5) +
+coord_fixed() +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = 'grey70', colour = '#7BFFCB', size = 0.5) +
+coord_fixed() +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = 'white', colour = '#7BFFCB', size = 0.5) +
+coord_fixed() +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#7BFFCB', colour = '#080818', size = 0.5) +
+coord_fixed() +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#7BFFCB', colour = '#080818', size = 0.5) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#7BFFCB', colour = '#080818', size = 0.5) +
+coord_map('rectangular', lat0 = 0, xlim = c(-170, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#7BFFCB', colour = '#080818', size = 0.5) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+worldmap$region
+test <-
+worldmap %>%
+as.factor(region)
+test <-
+worldmap %>%
+mutate(region = as.factor(region))
+levels(test$region)
+condf <-
+data.frame(region = c('China', 'Indonesia', 'USA', 'Canada'),
+value = c('panda', 'orang', 'orca', 'orca'),
+stringsAsFactors = FALSE)
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#7BFFCB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = 'pink', size = 0.5) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#7BFFCB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '080818', size = 0.5) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#7BFFCB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#8DFF92', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_discrete(values = c('#f4cae4', '#cbd5e8', '#fdcdac')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#f4cae4', '#cbd5e8', '#fdcdac')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#decbe4', '#fbb4ae', '#fed9a6')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#beaed4', '#fbb4ae', '#fed9a6')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+panel.grid = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend = element_blank())
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+panel.grid = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_text(size = legendText),
+legend.title = element_blank(),
+legend.spacing.x = unit(legendSpace, 'cm'),
+legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
+legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5, legend = FALSE) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+panel.grid = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_blank(),
+legend.title = element_blank(),
+legend.background = element_blank(),
+legend.key = element_blank())
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+panel.grid = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.position = 'none')
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_text(size = legendText),
+legend.title = element_blank(),
+legend.spacing.x = unit(legendSpace, 'cm'),
+legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
+legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme()
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme() +
+theme(legend.position = 'none')
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_text(size = legendText),
+legend.title = element_blank(),
+legend.spacing.x = unit(legendSpace, 'cm'),
+legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
+legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme() +
+theme(legend.position = 'none')
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+panel.grid = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_text(size = legendText),
+legend.title = element_blank(),
+legend.spacing.x = unit(legendSpace, 'cm'),
+legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
+legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
+map_theme <- function(legendSpace = 0.2, legendText = 13) {
+theme(plot.background = element_rect(fill = 'transparent', colour = NA),
+panel.background = element_rect(fill = '#080818', colour = '#080818'),
+panel.grid = element_blank(),
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+legend.text = element_text(size = legendText),
+legend.title = element_blank(),
+legend.spacing.x = unit(legendSpace, 'cm'),
+legend.background = element_rect(fill = 'transparent', colour = 'transparent'),
+legend.key = element_rect(fill = 'transparent', colour = 'transparent'))
+}
+ggplot() +
+geom_map(data = worldmap, map = worldmap,
+aes(x = long, y = lat, group = group, map_id = region),
+fill = '#C2FFBB', colour = '#080818', size = 0.5) +
+geom_map(data = condf, map = worldmap,
+aes(fill = value, map_id = region),
+colour = '#080818', size = 0.5) +
+scale_fill_manual(values = c('#fed9a6', '#fbb4ae', '#beaed4')) +
+coord_map('rectangular', lat0 = 0, xlim = c(-180, 180), ylim = c(-60, 90)) +
+labs(x = ' ', y = ' ') +
+map_theme() +
+theme(legend.position = 'none')
+SppIso <- read_csv('CompleteSpeciesISO_180924.csv')
+head(SppIso)
+View(SppIso)
+test <- read_csv('CountryCovariates_181109.csv')
+View(test)
+dunno <- SppIso %>% filter(presence == 'unknown')
+head(dunno)
+duplicated(dunno$country)
+View(dunno)
+dunno2 <- dunno %>% distinct(., ISO3, .keep_all = TRUE)
+duplicated(dunno$country)
+duplicated(dunno2$country)
+nrow(dunno2)
+know <- SppIso %>% filter(presence != 'unknown')
+View(known)
+View(know)
+all <- SppIso %>% distinct(., ISO3, .keep_all = TRUE)
+duplicated(all$ISO3)
+nrow(all)
+View(90)
+View(all)
+42/90
+detectCores()
+install.packages('parallel')

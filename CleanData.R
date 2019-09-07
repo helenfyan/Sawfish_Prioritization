@@ -656,3 +656,35 @@ ggplot(sawland, aes(x = year, y = mean_tonnes, colour = ISO3)) +
   geom_point() +
   geom_line()
 
+
+# Clean methods map -------------------------------------------------------------
+
+searchRaw <- read_csv('SawfishSearchMethods_190312.csv')
+
+searchClean <- 
+  searchRaw %>% 
+  # remove species from further analyses
+  # also remove reference IDs, citation, notes, and year
+  select(-species1:-species5, -citation, -notes, -year) %>% 
+  # gather the different survey types
+  gather(key = key, value = method, method1:method4) %>% 
+  # gather the different countries now
+  gather(key = key, value = country, country1:country25) %>% 
+  select(-key) %>% 
+  drop_na()
+
+View(searchClean)
+
+searchLatLong <- 
+  searchClean %>% 
+  mutate(lat = case_when())
+
+
+
+
+
+
+
+
+
+

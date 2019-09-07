@@ -9,28 +9,55 @@ library(ModelMetrics)
 library(pdp)
 library(broom)
 library(dismo)
+library(beepr)
+library(countrycode)
 
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets')
 
-rawSpp <- read_csv('ProcessedCovariates_181128.csv')
+rawSpp <- read_csv('../../../Datasets/ProcessedCovariates_190119.csv')
+
+rawDD <- read_csv('../../../Datasets/ProcessedDataDeficients_190208.csv')
 
 # test for collinearity ------------------------------------
 
 fishprod <- cor.test(rawSpp$logCoastPop, rawSpp$logFishProd, method = 'pearson')
 iuu <- cor.test(rawSpp$logIuu, rawSpp$logtotalGearTonnes, method = 'pearson')
 
-
 # regression tree analysis ---------------------------------
 
 sppData <-
   rawSpp %>%
   # remove collinear covariates
-  dplyr::select(-X1, -ISO3, -logFishProd, -logIuu) %>%
+  dplyr::select(-X1, -ISO3, -logFishProd, -logIuu,
+                -logChondLand, -EPI, -ReefFishers, -logFinUSD) %>%
   as.data.frame()
+
+
+# clean data-deficient data ---------------------------
+
+preddata <- 
+  rawDD %>% 
+  dplyr::select(-X1, -ISO3) %>% 
+  as.data.frame()
+
+
+#redo the prediction for all the ones that we have data for
+sppData2 <- 
+  sppData %>% 
+  as.data.frame()
+
+pred <- predict.gbm(object = cvgbm, 
+                    newdata = sppData2,
+                    n.trees = 1150,
+                    type = 'response')
+
+
 
 # need to randomize the data ---------------------------
 randomIndex <- sample(1:nrow(sppData), nrow(sppData))
 sppData <- sppData[randomIndex, ]
+
+
 
 # separate the data into training set (80%) and test set (20%) ------------------
 n <- nrow(sppData)
@@ -40,17 +67,41 @@ trainIndex <- sample(1:n, ntrain)
 sppTrain <- sppData[trainIndex, ]
 sppTest <- sppData[-trainIndex, ]
 
+#write.csv(sppTrain, 'GBMtrain_190119.csv')
+#write.csv(sppTest, 'GBMtest_190119.csv')
+
+sppTrain <- read_csv('../../../Datasets/GBMtrain_190119.csv')
+
+sppTrain <- 
+  sppTrain %>% 
+  dplyr::select(-X1, -logFinUSD) %>% 
+  .[, c(6, 1:5, 7:20)] %>% 
+  as.data.frame()
+
+sppTest <- read_csv('../../../Datasets/GBMtest_190119.csv')
+
+sppTest <- 
+  sppTest %>% 
+  dplyr::select(-X1, -logFinUSD) %>% 
+  .[, c(6, 1:5, 7:20)] %>% 
+  as.data.frame()
 
 # tune a gbm to find hyperparameters ---------------------------
 tunegrid <- expand.grid(shrinkage = c(0.0001, 0.005, 0.001),
-                        interaction.depth = c(2, 5, 10),
-                        n.minobsinnode = c(5, 10, 17),
+                        interaction.depth = c(5, 10),
+                        n.minobsinnode = c(5, 10),
                         bag.fraction = c(0.5, 0.9),
                         opttrees = 0,
                         rmse = 0)
 
+prog <- 1
+endtune <- 24
+progbar <- txtProgressBar(min = 0, max = endtune, style = 3)
+
 # grid search for hyperparameters
 for(i in 1:nrow(tunegrid)) {
+  
+  setTxtProgressBar(progbar, value = prog)
   
   gbmtune <- gbm(formula = occurrence ~ .,
                  distribution = 'bernoulli',
@@ -68,7 +119,10 @@ for(i in 1:nrow(tunegrid)) {
   # add min training error and trees to tunegrid
   tunegrid$opttrees[i] <- which.min(gbmtune$valid.error)
   tunegrid$rmse[i] <- sqrt(min(gbmtune$valid.error))
+  
+  prog <- prog + 1
 }
+beepr::beep()
 
 
 # find best hyperparameter combination
@@ -76,11 +130,10 @@ tunegrid %>%
   dplyr::arrange(rmse) %>%
   head(50)
 
-
 test <- gbm(formula = occurrence ~ .,
             distribution = 'bernoulli',
             data = sppTrain,
-            n.trees = 10000,
+            n.trees = 5000,
             interaction.depth = 10,
             shrinkage = 0.001,
             bag.fraction = 0.5,
@@ -89,39 +142,17 @@ test <- gbm(formula = occurrence ~ .,
             n.cores = NULL,
             verbose = FALSE)
 
+test
+summary(test, cBars = 10)
+
 testpred <- predict(object = test,
                     newdata = sppTest,
-                    n.trees = 3656)
+                    n.trees = 2400)
 
 
 auc1 <- auc(actual = sppTest$occurrence, predicted = testpred)
 
 print(auc1)
-
-# make pdp plots ----------------------------------------
-
-pdpplots <- 
-  lapply(names(sppTrain[2:23]), function(x) {
-    
-    pdf(paste('initGBMout', x, '.pdf', sep = ''))
-    
-    dfplot <- 
-      test %>% 
-      pdp::partial(pred.var = paste(x),
-                   grid.resolution = 102,
-                   n.trees = test$n.trees,
-                   prob = TRUE) %>% 
-      autoplot(rug = TRUE, train = sppData)
-      theme_classic()
-    
-    print(dfplot)
-    
-    dev.off()
-    
-  })
-
-
-
 
 # evaluate model performance and obtain performance values 
 
@@ -135,7 +166,8 @@ cvresults <- expand.grid(run = seq(1:1000),
                          evnulldev = 0,
                          evdev = 0,
                          evauc = 0)
-
+RIresults <- list()
+Predresults <- list()
 
 for(i in 1:1000) {
   
@@ -145,7 +177,7 @@ for(i in 1:1000) {
   
   # run cv gbm
   cvgbm <- gbm.step(data = randomSpp,
-                    gbm.x = 2:23,
+                    gbm.x = 2:20,
                     gbm.y = 1,
                     family = 'bernoulli',
                     tree.complexity = 10,
@@ -173,10 +205,112 @@ for(i in 1:1000) {
                                           calc.mean = TRUE)
   cvresults$evdev[i] <- (cvresults$evnulldev - cvresults$evresdev)/cvresults$evnulldev 
   
+  # relative influence results
+  relinf <- cvgbm$contributions
+  relinf$run <- i
+  
+  RIresults[[i]] <- relinf
+
+  # make predictions
+  pred <- 
+    predict(object = cvgbm,
+            newdata = preddata,
+            n.trees = cvgbm$n.trees,
+            type = 'response') %>% 
+    as.data.frame()
+  
+  pred$ISO3 <- rawDD$ISO3
+  pred$run <- i
+  
+  Predresults[[i]] <- pred
+  
+}
+beepr::beep()
+
+write.csv(cvresults, 'BRTBootstrapResults_190208.csv')
+cvresults <- read_csv('BRTBootstrapResults_190208.csv')
+
+cvsummary <- 
+  cvresults %>% 
+  mutate(cvr2 = cvcorr^2) %>% 
+  summarise_all(funs(mean, sd))
+
+
+totalRI <- data.frame()
+totalPred <- data.frame()
+
+for(i in 1:1000) {
+  
+  # bind all relative influences
+  ridf <- RIresults[[i]]
+  totalRI <- rbind(totalRI, ridf)
+  
+  # bind all predictions 
+  preddf <- Predresults[[i]]
+  totalPred <- rbind(totalPred, preddf)
+  
 }
 
+write.csv(totalPred, 'GBMPredicted_190208.csv')
+totalPred <- read_csv('../../../Datasets/GBMPredicted_190208.csv')
 
-write.csv(cvresults, 'BRTBootstrapResults_181203.csv')
+write.csv(totalRI, 'GBMRelativeInf_190208.csv')
+totalRI <- read_csv('GBMRelativeInf_190208.csv')
+
+# calculate RI for each variable 
+RIsum <- 
+  totalRI %>% 
+  group_by(var) %>% 
+  summarise(meanRI = mean(rel.inf),
+            maxRI = max(rel.inf),
+            minRI = min(rel.inf),
+            sdRI = dplyr::sd(rel.inf)) %>% 
+  arrange(desc(meanRI))
+
+# calculate RI for each index 
+RIind <- 
+  RIsum %>% 
+  dplyr::select(var, meanRI) %>% 
+  mutate(index = case_when(var == 'logCoastLength'|
+                             var == 'SstMean' |
+                             var == 'logPprodMean'|
+                             var == 'logEstDis' |
+                             var == 'logMang' ~ 'ecology',
+                           #var == 'logFinUSD' |
+                             var == 'logChondCatch' |
+                             var == 'logtotalGearTonnes' |
+                             var == 'logCoastPop' |
+                             var == 'logProteinDiet' ~ 'fishing',
+                             #var == 'ReefFishers' ~ 'fishing',
+                           var == 'NBI' |
+                            # var == 'EPI' |
+                             var == 'logGDP' |
+                             var == 'HDI' |
+                             var == 'OHI' |
+                             var == 'WGI' ~ 'management',
+                           var == 'speciesdwarf' |
+                             var == 'speciesgreen' |
+                             var == 'specieslarge' |
+                             var == 'speciesnarrow' |
+                             var == 'speciessmall' ~ 'species')) %>% 
+  group_by(index) %>% 
+  summarise(totalRI = sum(meanRI))
+
+# clean predictions
+predSum <- 
+  totalPred %>% 
+  dplyr::select(-X1) %>% 
+  dplyr::rename(pred = '.') %>% 
+  group_by(ISO3) %>% 
+  summarise(predPres = mean(pred),
+            predPresmin = min(pred),
+            predPresmax = max(pred)) %>% 
+  mutate(ISO3 = countrycode(ISO3, 'iso3c', 'country.name')) %>% 
+  mutate(probExt = (1 - predPres) * 100,
+         probExtmin = (1 - predPresmax) * 100,
+         probExtmax = (1 - predPresmin) * 100) %>% 
+  select(ISO3, probExt, probExtmin, probExtmax) %>%
+  dplyr::arrange(desc(probExt))
 
 
 # make all partial dependence plots ---------------------------------------------
@@ -289,7 +423,7 @@ testdf3 <-
 
 testplot <- 
   ggplot(testdf3, aes(x = logCoastLength, y = totalmean, group = 1)) +
-  geom_ribbon(aes(ymin = lowerci, ymax = upperci),
+  geom_ribbon(aes(ymin = totalmin, ymax = totalmax),
               alpha = 0.6, fill = 'steelblue4') +
   geom_line() +
   theme_classic()

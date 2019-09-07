@@ -1,127 +1,183 @@
 # THIS SCRIPT ANALYZES THE DATA WITH UNSCALED COVARIATES #
+# Cannot calculate scores for unscaled data #
 
 library(tidyverse)
 library(broom)
 library(reshape2)
 library(car)
 library(MuMIn)
+library(dotwhisker)
 
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets')
 
-# Can separate analysis to be species-specific --------------------------
-sppData <- read_csv('CompleteSpeciesCovariates_181012.csv')
-
-sppRaw <-
-  sppData %>%
-  select(country, ISO3, region, species, presence, occurrence,
-         PprodMean, NBI, coastal.pop, Lengthkm, EPI, Discharge, ExporttoHK2010,
-         MeanPro, GDP, HDI, OHI, UnreportedPercent, impact.percentage,
-         no_reef_fishers, AreaSqKM, TotalTonnes, WGI, SstMean) %>%
-  rename(Nbi = NBI, 
-         CoastPop = coastal.pop,
-         CoastLength = Lengthkm,
-         Epi = EPI,
-         EstDist = Discharge,
-         ExpHK = ExporttoHK2010,
-         ProteinSup = MeanPro,
-         Gdp = GDP,
-         Hdi = HDI,
-         Ohi = OHI,
-         Iuu = UnreportedPercent,
-         ManImp = impact.percentage,
-         ReefFisher = no_reef_fishers,
-         Saltmarsh = AreaSqKM,
-         ChondLand = TotalTonnes,
-         Wgi = WGI) %>%
-  filter(presence != 'unknown')
-
-# Drop covariates that have too many missing values or are redundant --------
-modSpp <-
-  sppRaw %>%
-  select(-Saltmarsh, -ReefFisher, -Hdi, -Ohi, -Epi, -Nbi)
-
-# Model formula for all covariates used ------------------
-cols <- names(modSpp)
-allCovs <- cols[7:18]
-
-allFormula <- paste('occurrence ~ ', paste(allCovs, collapse = ' + '))
-
 options(na.action = na.fail)
 
-# Maximum model for largetooth sawfish ------------------------------------
+# make presentation theme for all figures ------------------------
+presentation_theme <- function(axis_text_size = 13, axis_y_ticks = element_line()) {
+  theme(panel.background = element_blank(),
+        axis.line = element_line(colour = 'black'),
+        axis.text.y = element_text(size = axis_text_size, colour = 'black'),
+        axis.text.x = element_text(colour = 'black'),
+        axis.ticks.y = axis_y_ticks,
+        axis.title = element_text(size = 14))
+}
+
+# Models using species as a factor  --------------------------------------
+
+rawspp <- read_csv('CompleteSpeciesCovariates_181109.csv')
+
+spp <-
+  rawspp %>%
+  select(1:26) %>%
+  filter(occurrence != '2') %>%
+  select(-totalGearValue) %>%
+  drop_na()
+
+# maximum model --------------------------------------
+
+vars <- names(spp)
+covsMax <- vars[8:25]
+covs1 <- vars[c(8:9, 11:12, 14:17, 20:25)]
+
+formulaMax <- paste('occurrence ~ ', paste(covs, collapse = ' + '))
+formula1 <- paste('occurrence ~ ', paste(covs1, collapse = ' + '))
+
+# largetooth sawfish max model ---------------------------------
 
 large <-
-  modSpp %>%
-  filter(species == 'large') %>%
-  drop_na()
+  spp %>%
+  filter(species == 'large') 
 
-allLarge <-
-  glm(allFormula, family = binomial, large)
+maxLarge <- glm(formulaMax, family = binomial, large)
+summary(maxLarge)
 
-modsLarge <-
-  dredge(allLarge) %>%
-  as_tibble(.) %>%
-  filter(delta < 2)
+# dredge the model after dropping certain indices -------
 
+modLarge1 <- glm(formula1, family = binomial, large)
+summary(modLarge1)
 
-# Maximum model for all sawfish spp combined ------------------------------------
+largeDredge <-
+  dredge(modLarge1)
 
-allData <- read_csv('CountryCovariates_181022.csv')
-
-allRaw <-
-  allData %>%
-  select(country, ISO3, species, nospecies, occurrence,
-         PprodMean, NBI, coastal.pop, Lengthkm, EPI, Discharge, ExporttoHK2010,
-         MeanPro, GDP, HDI, OHI, UnreportedPercent, impact.percentage,
-         no_reef_fishers, AreaSqKM, TotalTonnes, WGI, SstCountMean) %>%
-  rename(Nbi = NBI, 
-         CoastPop = coastal.pop,
-         CoastLength = Lengthkm,
-         Epi = EPI,
-         EstDist = Discharge,
-         ExpHK = ExporttoHK2010,
-         ProteinSup = MeanPro,
-         Gdp = GDP,
-         Hdi = HDI,
-         Ohi = OHI,
-         Iuu = UnreportedPercent,
-         ManImp = impact.percentage,
-         ReefFisher = no_reef_fishers,
-         Saltmarsh = AreaSqKM,
-         ChondLand = TotalTonnes,
-         Wgi = WGI,
-         SstMean = SstCountMean) 
-
-modAll <- 
-  allRaw %>%
-  select(-Saltmarsh, -ReefFisher) %>%
-  drop_na()
-
-#sapply(modAll, function(x) sum(is.na(x)))
-
-
-allSpp <-
-  glm(allFormula, family = binomial, modAll)
-
-modsSpp <-
-  dredge(allSpp) %>%
-  as_tibble(.) %>%
+largeDredgeDf <-
+  largeDredge %>%
+  as.tibble(.) %>%
   filter(delta <= 2)
 
-noHKcovs <- cols[c(7:10, 12:18)]
-noHKFormula <- paste('occurrence ~ ', paste(noHKcovs, collapse = ' + '))
 
-noHK <-
-  allRaw %>%
-  select(-Saltmarsh, -ReefFisher, -ExpHK) %>%
+#---------------------------------------------------------------------------------
+# Analyze without using species as a factor --------------------------------------
+#---------------------------------------------------------------------------------
+raw <- read_csv('CountryCovariates_181109.csv')
+
+nosp <- 
+  raw %>%
+  .[, c(1:7, 9:25)] %>%
   drop_na()
 
-noHKSpp <-
-  glm(noHKFormula, family = binomial, noHK)
+# correlation heatmap of variables
 
-modsnoHK <-
-  dredge(noHKSpp) %>%
-  as_tibble(.) %>%
-  filter(delta <= 2)
+cormatdat <-
+  nosp %>%
+  .[, c(6:24)]
+
+cormat <- round(cor(cormatdat), 2)
+
+# reorder the cormat according to magnitude of correlation
+reorderCormat <- function(cormat) {
+  # use correlation between variables as distance
+  dd <- as.dist((1-cormat)/2)
+  hc <- hclust(dd)
+  cormat <- cormat[hc$order, hc$order]
+}
+
+cormat <- reorderCormat(cormat)
+
+# get rid of half the info
+GetLowerTri <- function(cormat) {
+  cormat[upper.tri(cormat)] <- NA
+  return(cormat)
+}
+
+lowerTri <- GetLowerTri(cormat)
+
+
+melt(lowerTri, na.rm = TRUE) %>%
+  mutate(Var2 = dplyr::recode(Var2, 'EstDis' = 'Estuaries Discharge (ESD)',
+                              'PprodMean' = 'Primary Productivity (PPD)',
+                              'HkExp' = 'Hong Kong Exports (HKE)',
+                              'CoastPop' = 'Coastal Population (CTP)',
+                              'ChondLand' = 'Chondrichthyes Landings (CHL)',
+                              'SstMean' = 'Sea Surface Temperature (°C; SST)',
+                              'Mang' = 'Mangrove Area (MNG)',
+                              'HDI' = 'Human Development Index (HDI)',
+                              'EPI' = 'Environmental Performance Index (EPI)',
+                              'WGI' = 'World Governance Index (WGI)',
+                              'OHI' = 'Ocean Health Index (OHI)',
+                              'NBI' = 'National Biodiversity Index (NBI)',
+                              'Iuu' = 'Illegal Unreported and Unregulated Fishing (IUU)',
+                              'GDP' = 'Gross Domestic Product (GDP)',
+                              'CoastLength' = 'Coastline length (km; CLL)',
+                              'ProteinDiet' = 'Marine Protein Supply (MPS)',
+                              'totalGearTonnes' = 'Fishing Gear Landed Tonnes (FGT)',
+                              'Saltmarsh' = 'Saltmarsh Area (SMA)',
+                              'ReefFishers' = 'Reef Fishers (RFF)')) %>%
+  mutate(Var1 = dplyr::recode(Var1, 'EstDis' = 'ESD',
+                              'PprodMean' = 'PPD',
+                              'HkExp' = 'HKE',
+                              'CoastPop' = 'CTP',
+                              'ChondLand' = 'CHL',
+                              'SstMean' = 'SST',
+                              'Mang' = 'MNG',
+                              'HDI' = 'HDI',
+                              'EPI' = 'EPI',
+                              'WGI' = 'WGI',
+                              'OHI' = 'OHI',
+                              'NBI' = 'NBI',
+                              'Iuu' = 'IUU',
+                              'GDP' = 'GDP',
+                              'CoastLength' = 'CLL',
+                              'ProteinDiet' = 'MPS',
+                              'totalGearTonnes' = 'FGT',
+                              'Saltmarsh' = 'SMA',
+                              'ReefFishers' = 'RFF')) %>%
+  mutate(Var1 = as.factor(Var1)) %>%
+  mutate(Var1 = factor(Var1, levels = rev(levels(Var1)))) %>%
+  ggplot(., aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(colour = 'white') +
+  scale_fill_gradient2(high = 'red', low = 'blue', mid = 'white',
+                       midpoint = 0, limit = c(-1, 1), space = 'Lab',
+                       name = 'Pearson\nCorrelation') +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                   size = 12, hjust = 1)) +
+  coord_fixed() +
+  geom_text(aes(x = Var1, y = Var2, label = value), colour = 'black', size = 3) +
+  theme(legend.justification = c(1, 0),
+  legend.position = c(0.95, 0.85),
+  legend.direction = 'horizontal') +
+  guides(fill = guide_colourbar(barwidth = 7, barheight = 1,
+                                title.position = 'top', title.hjust = 0.5)) +
+  labs(title = 'Correlation Heatmap with Raw Covariates', y = ' ', x = ' ')
+
+
+# maximum model -------------------------------------------------------
+
+maxAll <- glm(formulaMax, family = binomial, nosp)
+summary(maxAll)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
