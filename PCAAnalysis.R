@@ -1,14 +1,13 @@
 ##### PRINCIPAL COMPONENT ANALYSIS FOR EXPLANATORY VARIABLES #####
 
 rm(list=ls())
-setwd("/users/helenyan/desktop/school/directed studies 2018/datasets")
 
 library(stats)
 library(tidyverse)
 library(devtools)
 library(ggbiplot)
 
-dataRaw <- read_csv('CompleteSpeciesCovariates_181119.csv')
+dataRaw <- read_csv('../../../Datasets/CompleteSpeciesCovariates_181119.csv')
 
 allData <-
   dataRaw %>%
@@ -145,10 +144,8 @@ dwarf
 green <- plot_occ('Green')
 green
 
-
 small <- plot_occ('Smalltooth')
 small
-
 
 narr <- plot_occ('Narrow')
 narr
@@ -192,7 +189,8 @@ library(ggfortify)
 ecc_pca_df <- 
   datatrans %>% 
   select(occurrence, speciesdwarf, speciesgreen, specieslarge, speciesnarrow, speciessmall,
-         SstMean, logPprodMean, logCoastLength, logEstDis, logMang) %>% 
+         SstMean, logPprodMean, logCoastLength, logEstDis, logMang, logProteinDiet,
+         logtotalGearTonnes) %>% 
   mutate(species = case_when(speciesdwarf == 1 ~ 'Dwarf',
                              speciesgreen == 1 ~ 'Green',
                              specieslarge == 1 ~ 'Largetooth',
@@ -210,7 +208,8 @@ ecc_pca <-
                 'SST' = 'SstMean') %>% 
   nest() %>% 
   mutate(pca = map(data, ~ prcomp(.x %>% 
-                                    select(-occurrence, -species),
+                                    select(-occurrence, -species, -logProteinDiet,
+                                           -logtotalGearTonnes),
                                   center = TRUE,
                                   scale = TRUE)),
          pca_aug = map2(pca, data, ~ augment(.x, data = .y)))
@@ -250,7 +249,7 @@ ecc_pc1 <-
   ecc_pca %>% 
   select(pca_aug) %>% 
   unnest() %>% 
-  select(-.rownames, -c(10:13)) %>% 
+  select(-.rownames, -.fittedPC2, -.fittedPC3, -.fittedPC4, -.fittedPC5) %>% 
   dplyr::rename(PC1 = .fittedPC1)
 
 ecc_pc1
@@ -288,8 +287,8 @@ spp_pca_plots <- lapply(unique(ecc_pc1$species), plot_pca)
 pca_grid <- grid.arrange(spp_pca_plots[[1]], spp_pca_plots[[4]], spp_pca_plots[[3]],
                          spp_pca_plots[[5]], spp_pca_plots[[2]], ncol = 2)
 
-ggsave('../../../Figures/EcoCarryCapacity/OccPC1_190830.pdf', pca_grid,
-       height = 19.05, width = 30.59, units = c('cm'))
+#ggsave('../../../Figures/EcoCarryCapacity/OccPC1_190830.pdf', pca_grid,
+#      height = 19.05, width = 30.59, units = c('cm'))
 
 
 # all species combined ----------------------
@@ -312,8 +311,59 @@ spp_pc1 <-
 
 spp_pc1
 
-ggsave('../../../Figures/EcoCarryCapacity/OccPC1AllSpp_190930.pdf', spp_pc1,
-       height = 19.05, width = 30.59, units = c('cm'))
+#ggsave('../../../Figures/EcoCarryCapacity/OccPC1AllSpp_190930.pdf', spp_pc1,
+#       height = 19.05, width = 30.59, units = c('cm'))
 
 mod_pca <- glm(occurrence ~ PC1, ecc_pc1, family = 'binomial')
 summary(mod_pca)
+
+
+# Plot ECC with effects of fishing pressure on occurrence -----------------------------
+
+# make a dataframe where fishing pressures are binned
+
+# get quartiles of protein diet
+
+proteinQ <- summary(ecc_pc1$logProteinDiet)
+proteinQ1 <- proteinQ[2]
+proteinQ3 <- proteinQ[5]
+
+fish_pc1 <- 
+  ecc_pc1 %>% 
+  mutate(fishBin = case_when(logProteinDiet <= proteinQ1 ~ 'low',
+                             logProteinDiet >= proteinQ3 ~ 'high',
+                             TRUE ~ as.character('moderate')))
+
+# using PC1
+pc1_fish <- 
+  ggplot(fish_pc1, aes(x = PC1, y = occurrence, colour = fishBin, fill = fishBin)) +
+  geom_point(size = 4, shape = '|',
+             colour = 'grey40', alpha = 0.9) +
+  geom_smooth(method = 'glm', method.args = list(family = 'binomial'),
+              colour = 'darkblue') +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme_classic()
+
+pc1_fish
+
+mod_fish <- glm(occurrence ~ PC1*fishBin, fish_pc1,
+                family = 'binomial')
+
+summary(mod_fish)
+
+
+# using coastline length
+
+coast_fish <- 
+  ggplot(fish_pc1, aes(x = logCoastLength, y = occurrence, colour = fishBin, fill = fishBin)) +
+  geom_point(size = 4, shape = '|',
+             colour = 'grey40', alpha = 0.9) +
+  geom_smooth(method = 'glm', method.args = list(family = 'binomial'),
+              colour = 'darkblue') +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme_classic()
+
+coast_fish
+
+mod_coast <- glm(occurrence ~ logCoastLength*fishBin, fish_pc1, family = 'binomial')
+summary(mod_coast)
