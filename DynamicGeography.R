@@ -356,3 +356,5 @@ gearb3
 mod1 <- glm(occurrence ~ logCoastLength*fishBin3*gearBin3, 
             family = 'binomial', fish_pc1_bin)
 summary(mod1)
+
+write_csv(fish_pc1_bin, '../../../Datasets/DynamicGeographyBinned_190925.csv')
