@@ -27,6 +27,10 @@ pc_data <-
                                   'moderate' = 'Moderate',
                                   'high' = 'High'))
 
+# ----------------------------------------------------------------------
+# WITH FISHING ---------------------------------------------------------
+# ----------------------------------------------------------------------
+
 mod_fishBin3 <- 
   brm(occurrence ~ logCoastLength*fishBin3,
       data = pc_data, 
@@ -40,6 +44,8 @@ summary(mod_fishBin3)
 get_variables(mod_fishBin3)
 
 # plot with draws ---------------
+set.seed(123)
+
 fitlines_plot <- 
   pc_data %>% 
   mutate(fishBin3 = factor(fishBin3, levels = c('Low', 'Moderate', 'High'))) %>% 
@@ -52,21 +58,23 @@ fitlines_plot <-
   scale_colour_manual(values = c('#fd8d3c', '#fc4e2a', '#bd0026')) + 
   geom_point(data = pc_data, size = 4, shape = '|',
              colour = 'grey60', alpha = 0.7) +
-  stat_lineribbon(aes(y = .value),
-                  .width = c(0, 0, 0),
-                  show.legend = FALSE) +
+  geom_smooth(data = pc_data, method = 'glm',
+             method.args = list(family = 'binomial'),
+             se = FALSE, size = 1.5) +
   scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
   labs(y = 'Occurrence', 
        x = 'log Coastline Length (km)',
        colour = 'Fishing Pressure') +
   theme(legend.key = element_rect(fill = NA),
         legend.title = element_text(size = 14, colour = 'grey20'),
-        legend.text = element_text(size = 13, colour = 'grey20')) +
+        legend.text = element_text(size = 13, colour = 'grey20'),
+        legend.position = c(0.02, 0.9)) +
   guides(colour = guide_legend(override.aes = list(size = 2,
                                                    alpha = 0.8))) +
   publication_theme()
 
 fitlines_plot
+
 
 # plot of posterior distributions ---------------------------
 post_values <- 
@@ -77,30 +85,6 @@ post_values <-
                 'Low' = 'b_fishBin3Low') %>% 
   gather(key = fishing, value = post_pred) %>% 
   mutate(fishing = factor(fishing, levels = c('Low', 'Moderate', 'High')))
-
-post_plot <- 
-  ggplot(post_values, aes(x = post_pred, fill = fishing, colour = fishing)) +
-  geom_density(alpha = 0.6) +
-  scale_fill_manual(values = c('#fd8d3c', '#fc4e2a', '#bd0026')) +
-  scale_colour_manual(values = c('#fd8d3c', '#fc4e2a', '#bd0026')) +
-  expand_limits(y = c(0, 0.15),
-                x = c(-22, 22)) +
-  facet_wrap(~ fishing, nrow = 3,
-             strip.position = 'left') +
-  geom_vline(xintercept = 0, linetype = 'dashed', colour = 'grey60', size = 0.7) +
-  theme(legend.position = 'none',
-        strip.background = element_blank(),
-        strip.placement = 'outside',
-        strip.text.y = element_text(size = 13, colour = 'grey20', angle = 180),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        panel.spacing = unit(0, 'lines')) +
-  publication_theme() +
-  labs(x = 'Posterior Prediction',
-       y = '')
-
-post_plot
-
   
 # to colour based on overlap with zero ------------------------
 make_density <- 
@@ -118,14 +102,13 @@ make_density <-
                  size = 0.7) +
       theme(axis.text = element_blank(),
             axis.line.x = element_blank(),
-            axis.line.y = element_line(),
+            axis.line.y = element_line(colour = 'grey60'),
             panel.grid = element_blank(),
             panel.background = element_blank(),
             axis.title = element_blank(),
             axis.ticks = element_blank(),
             plot.margin = unit(c(-0.08, 0, 0, 1), 'cm'))
       
-    
     # make plot dataframe
     dens_df <- 
       ggplot_build(basic_dens)$data[[1]]
@@ -158,7 +141,7 @@ mod
 
 high <- 
   make_density('High', '#BE827E', '#bd0026') +
-  theme(axis.line.x = element_line(),
+  theme(axis.line.x = element_line(colour = 'grey60'),
         axis.text.x = element_text(size = 13, colour = 'grey20'),
         axis.title.y = element_text(size = 13, colour = 'grey20', angle = 0, hjust = 0,
                                     vjust = 0.5)) +
@@ -167,8 +150,95 @@ high <-
 
 high
 
+# ----------------------------------------------------------------------
+# WITHOUT FISHING ------------------------------------------------------
+# ----------------------------------------------------------------------
+
+mod_nofish <- 
+  brm(occurrence ~ logCoastLength,
+      data = pc_data,
+      family = 'bernoulli',
+      seed = 123)
+
+#saveRDS(mod_nofish, '../../../ModelOutputs/DGNoFish_190910.rds')
+mod_nofish <- readRDS('../../../ModelOutputs/DGNoFish_190910.rds')
+
+summary(mod_nofish)
+
+# fitlines plot ----------------------
+fitlines_nofish <- 
+  pc_data %>% 
+  data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+  add_fitted_draws(mod_nofish, n = 200) %>% 
+  ggplot(aes(x = logCoastLength, y = occurrence)) +
+  geom_line(aes(y = .value, group = paste(.draw)), alpha = 0.1,
+            colour = 'darkblue') +
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pc_data,
+              method = 'glm', method.args = list(family = 'binomial'),
+              se = FALSE, colour = 'darkblue',
+              size = 1.5) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
+  publication_theme()
+  
+
+fitlines_nofish
+
+fitlines_all <- 
+  plot_grid(fitlines_nofish, fitlines_plot, ncol = 1,
+            align = 'v', scale = 1)
+
+fitlines_all
+
+#posterior distrbution plot --------------
+post_values_nofish <- 
+  posterior_samples(mod_nofish, '^b') %>% 
+  dplyr::select('b_Intercept')
+
+basic_dens <- 
+  ggplot(post_values_nofish, aes(x = b_Intercept)) +
+  geom_density(colour = 'grey90') +
+  expand_limits(x = c(-23, 23),
+                y = c(0, 0.4)) +
+  geom_vline(xintercept = 0, linetype = 'dashed', colour = 'grey60',
+             size = 0.7) +
+  theme(axis.text = element_blank(),
+        axis.line.y = element_line(colour = 'grey60'),
+        axis.line.x = element_line(colour = 'grey60'),
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title.y = element_text(size = 13, colour = 'grey20', angle = 0, hjust = 0,
+                                    vjust = 0.5)) +
+  labs(y = 'No Fishing')
+  
+dens_df <- ggplot_build(basic_dens)$data[[1]]
+
+nofish_plot <- 
+  basic_dens +
+  geom_area(data = dens_df %>% 
+              dplyr::filter(x < 0),
+            aes(x = x, y = y),
+            fill = 'darkblue')
+
+nofish_plot
+
+
+
 all_density <- 
-  plot_grid(low, mod, high, ncol = 1, align = 'v', scale = 1)
+  plot_grid(nofish_plot, low, mod, high, ncol = 1, align = 'v', scale = 1)
 
 all_density
-ggdraw(add_sub(all_density, 'Posterior Prediction', hjust = 0.1))
+all_density2 <- ggdraw(add_sub(all_density, 'Posterior Prediction', hjust = 0.1))
+
+all_plots <- 
+  plot_grid(fitlines_all, all_density2, ncol = 2)
+
+all_plots
+
+ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191010.pdf', all_plots,
+       height = 20, width = 30, units = c('cm'))
