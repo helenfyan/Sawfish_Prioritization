@@ -12,16 +12,9 @@ library(dismo)
 library(beepr)
 library(countrycode)
 
-setwd('/users/helenyan/desktop/school/directed studies 2018/datasets')
-
 rawSpp <- read_csv('../../../Datasets/ProcessedCovariates_190119.csv')
 
 rawDD <- read_csv('../../../Datasets/ProcessedDataDeficients_190208.csv')
-
-# test for collinearity ------------------------------------
-
-fishprod <- cor.test(rawSpp$logCoastPop, rawSpp$logFishProd, method = 'pearson')
-iuu <- cor.test(rawSpp$logIuu, rawSpp$logtotalGearTonnes, method = 'pearson')
 
 # regression tree analysis ---------------------------------
 
@@ -41,19 +34,9 @@ preddata <-
   as.data.frame()
 
 
-#redo the prediction for all the ones that we have data for
-sppData2 <- 
-  sppData %>% 
-  as.data.frame()
-
-pred <- predict.gbm(object = cvgbm, 
-                    newdata = sppData2,
-                    n.trees = 1150,
-                    type = 'response')
-
-
-
 # need to randomize the data ---------------------------
+set.seed(123)
+
 randomIndex <- sample(1:nrow(sppData), nrow(sppData))
 sppData <- sppData[randomIndex, ]
 
@@ -67,22 +50,22 @@ trainIndex <- sample(1:n, ntrain)
 sppTrain <- sppData[trainIndex, ]
 sppTest <- sppData[-trainIndex, ]
 
-#write.csv(sppTrain, 'GBMtrain_190119.csv')
-#write.csv(sppTest, 'GBMtest_190119.csv')
+write.csv(sppTrain, '../../../Datasets/GBMtrain_191011.csv')
+write.csv(sppTest, '../../../Datasets/GBMtest_191011.csv')
 
-sppTrain <- read_csv('../../../Datasets/GBMtrain_190119.csv')
+#sppTrain <- read_csv('../../../Datasets/GBMtrain_190119.csv')
 
 sppTrain <- 
   sppTrain %>% 
-  dplyr::select(-X1, -logFinUSD) %>% 
+  # need to reorder for analysis
   .[, c(6, 1:5, 7:20)] %>% 
   as.data.frame()
 
-sppTest <- read_csv('../../../Datasets/GBMtest_190119.csv')
+#sppTest <- read_csv('../../../Datasets/GBMtest_190119.csv')
 
 sppTest <- 
   sppTest %>% 
-  dplyr::select(-X1, -logFinUSD) %>% 
+  # need to reorder for analysis
   .[, c(6, 1:5, 7:20)] %>% 
   as.data.frame()
 
@@ -139,7 +122,7 @@ test <- gbm(formula = occurrence ~ .,
             bag.fraction = 0.5,
             n.minobsinnode = 5,
             cv.folds = 10,
-            n.cores = NULL,
+            n.cores = 4,
             verbose = FALSE)
 
 test
@@ -147,15 +130,16 @@ summary(test, cBars = 10)
 
 testpred <- predict(object = test,
                     newdata = sppTest,
-                    n.trees = 2400)
+                    n.trees = 2700)
 
 
 auc1 <- auc(actual = sppTest$occurrence, predicted = testpred)
 
 print(auc1)
 
-# evaluate model performance and obtain performance values 
+# evaluate model performance and obtain performance values -----------------
 
+# make a df to infill with model eval values
 cvresults <- expand.grid(run = seq(1:1000),
                          cvauc = 0,
                          cvdev = 0,
@@ -166,7 +150,27 @@ cvresults <- expand.grid(run = seq(1:1000),
                          evnulldev = 0,
                          evdev = 0,
                          evauc = 0)
+
+# make empty list to infill with relative influence values
 RIresults <- list()
+
+# make empty dataframe to infill with predictions of the test set values
+
+cvgbm <- gbm.step(data = sppTrain,
+                  gbm.x = .,
+                  gbm.y = 'occurrence',
+                  family = 'bernoulli',
+                  tree.complexity = 10,
+                  learning.rate = 0.001,
+                  bag.fraction = 0.5,
+                  n.folds = 10)
+
+pred <- predict.gbm(object = test, 
+                    newdata = sppTest,
+                    n.trees = test$gbm.call$best.trees,
+                    type = 'response')
+
+# make empty list to infill with predictions of data-deficient values
 Predresults <- list()
 
 for(i in 1:1000) {
@@ -211,7 +215,7 @@ for(i in 1:1000) {
   
   RIresults[[i]] <- relinf
 
-  # make predictions
+  # make predictions on data-deficient values
   pred <- 
     predict(object = cvgbm,
             newdata = preddata,
@@ -400,7 +404,6 @@ for(i in 1:22) {
 }
 
 
-
 #as.data.frame(matrix(alldf[[1]][, 2], nrow = 102, ncol = 1000)) loses the first col
 testdf <- 
   alldf[[13]][1:306, ]
@@ -431,370 +434,52 @@ testplot <-
 print(testplot)
 
 
+# Check the predictive accuracy of model with Cohen's Kappa -----------------------------------
 
-#-------------------------------------------------------------------------------
+# load and clean predictions dataset
+pred_raw <- read_csv('../../../Datasets/BRTBootstrapResults_190208.csv')
 
+pred <- 
+  pred_raw %>% 
+  dplyr::select(-X1) %>% 
+  dplyr::rename('predicted_value' = '.')  
 
-for(i in 1:1000)
-  dataframe <- pdpdf[[i]]
-  dataframe <- rbind(dataframe + pdpdf[[i]])
+head(pred)
 
+# load and clean actual values
 
-pdpresults <- 
-  expand.grid(run = rep(1:2, times = 102),
-                    dwarf = 0, dwarfy = 0,
-                    green = 0, greeny = 0,
-                    large = 0, largey = 0,
-                    narrow = 0, narrowy = 0,
-                    small = 0, smally = 0,
-                    sst = 0, ssty = 0,
-                    fin = 0, finy = 0,
-                    chondland = 0, chondlandy = 0,
-                    gear = 0, geary = 0,
-                    pprod = 0, pprody = 0,
-                    nbi = 0, nbiy = 0,
-                    coastpop = 0, coastpopy = 0,
-                    coastlength = 0, coastlengthy = 0,
-                    epi = 0, epiy = 0,
-                    estdis = 0, estdisy = 0,
-                    prodiet = 0, prodiety = 0,
-                    gdp = 0, gdpy = 0,
-                    hdi = 0, hdiy = 0,
-                    ohi = 0, ohiy = 0,
-                    mang = 0, mangy = 0,
-                    reef = 0, reefy = 0,
-                    wgi = 0, wgiy = 0) %>% 
-  arrange(run)
-
-
-
-  
-  
-  hdi <- 
-    pdpgbm %>% 
-    pdp::partial(pred.var = 'HDI',
-                 grid.resolution = 102,
-                 n.trees = pdpgbm$n.trees,
-                 prob = TRUE) %>% 
-    dplyr::rename(hdiy = yhat)
-  
-  hdi$run <- i
-  
-  hditest[[i]] <- hdi
-  
-}
-
-biglist <- dplyr::bind_rows(hditest)
-
-pdpresults$hdi[i] <- hdi$HDI
-pdpresults$hdiy[i] <- hdi$yhat
-
-
-
-coastpdp <- 
-  test %>%
-  pdp::partial(pred.var = 'HDI',
-               grid.resolution = 102,
-               n.trees = test$n.trees,
-               prob = TRUE) %>% 
-  mutate(run = paste(i))
-
-
-
-
-
-
-
-# train the GBM model using dismo package --------------------------
-gbmfit <- gbm(formula = occurrence ~ .,
-              distribution = 'bernoulli',
-              data = sppTrain,
-              n.trees = 5000,
-              interaction.depth = 10,
-              shrinkage = 0.001,
-              bag.fraction = 0.5,
-              cv.folds = 10,
-              n.cores = NULL,
-              verbose = FALSE )
-
-opttrees <- gbm.perf(object = gbmfit,
-                     method = 'cv')
-
-
-
-
-
-# do the cross-validation separately with the gbm package -----------
-
-# make the two data frames to input values
-
-cvout <- expand.grid(cvfold = seq(1:10), cvcorr = 0, cvauc = 0,
-                     cvdev = 0)
-
-# randomize data then partition the data into 10-folds 
-
-randomIndex <- sample(1:nrow(sppData), nrow(sppData))
-randomSpp <- sppData[randomIndex, ]
-
-k <- 10
-n <- floor(nrow(randomSpp)/k)
-
-for(i in 1:k) {
-  
-  # split the subsets
-  s1 <- ((i - 1) * (n + 1))
-  s2 <- (i * n)
-  
-  subs <- s1:s2
-  
-  spptrain <- randomSpp[-subs, ]
-  spptest <- randomSpp[subs, ]
-  
-  # run the model
-  gbmmod <- gbm(formula = occurrence ~ .,
-                distribution = 'bernoulli',
-                data = spptrain,
-                n.trees = 5000,
-                interaction.depth = 10,
-                shrinkage = 0.001,
-                bag.fraction = 0.5,
-                n.cores = NULL,
-                verbose = FALSE)
-  
-  # calculate cv value corr and cv dev
-  cvout$cvcorr[i] <- cor(gbmmod$fit, spptrain$occurrence)
-  cvout$cvdev[i] <- min(gbmmod$train.error)
-  
-  # optimum number of trees per run
-  treeopt <- gbm.perf(object = gbmmod,
-                      method = 'OOB')
-  
-  # calculate cv auc
-  cvpred <- predict(object = gbmmod,
-                    newdata = spptest,
-                    n.trees = treeopt)
-  cvout$cvauc[i] <- gbm.roc.area(spptest$occurrence, cvpred)
-  
-  # get the partial dependence values for each run 
-  
-}
-
-
-# try to write a loop or function to repeat model 5 times and maintain the output
-
-cvdf <- expand.grid(run = seq(1:5), auc = 0, corr = 0, dev = 0)
-relinf <- list()
-  #expand.grid(run = seq(1:10),
-          #            vars = names(sppData),
-          #            inf = 0)
-  
-for(i in 1:5) {
-    
-  # randomize the data everytime
-  randomIndex <- sample(1:nrow(sppData), nrow(sppData))
-  randomSpp <- sppData[randomIndex, ]
-    
-  # run the gbm
-  allgbm <- gbm.step(data = randomSpp,
-                     gbm.x = 2:25,
-                     gbm.y = 1,
-                     family = 'bernoulli',
-                     tree.complexity = 10,
-                     learning.rate = 0.001,
-                     bag.fraction = 0.5,
-                     n.folds = 10)
-    
-  # extract model outputs into df
-  cvdf$auc[i] <- allgbm$cv.statistics$discrimination.mean
-  cvdf$corr[i] <- allgbm$cv.statistics$correlation.mean
-  cvdf$dev[i] <- allgbm$cv.statistics$deviance.mean
-  
-}
-
-dismodf <-
-  as.tibble(cvdf) %>%
-  mutate(rsq = corr^2)
-
-# dismo package using gbm.step ---------------------------------
-
-
-allSppdf <- data.frame(sppData)
-
-randomIndex <- sample(1:nrow(allSppdf), nrow(allSppdf))
-randomSpp <- allSppdf[randomIndex, ]
-
-dismogbm <- gbm.step(data = sppData,
-                   gbm.x = 2:25,
-                   gbm.y = 1,
-                   family = 'bernoulli',
-                   tree.complexity = 10,
-                   learning.rate = 0.001,
-                   bag.fraction = 0.5,
-                   n.folds = 10)
-
-gbm.plot(dismogbm, variable.no = 14, rug = TRUE, plot.layout = c(1, 1))
-
-
-for(i in 1:24) {
-  
-  print(plot(alltest, i.var = i, type = 'response', rug = TRUE))
-  
-}
-
-# gbm package --------------------------------------
-
-gbmgbm <- gbm(formula = occurrence ~ .,
-                distribution = 'bernoulli',
-                data = sppData,
-                n.trees = 5000,
-                #cv.folds = 10,
-                interaction.depth = 10,
-                shrinkage = 0.001,
-                bag.fraction = 0.5,
-                n.cores = NULL,
-                verbose = FALSE)
-
-summary(gbmgbm, cBars = 10)
-
-gbmopt <- gbm.perf(object = gbmgbm,
-                   method = 'cv')
-# gives cv deviance
-dev <- min(gbmgbm$cv.error)
-
-# gives cv correlation
-gbmcvr <- (cor(gbmgbm$cv.fitted, sppData$occurrence))
-
-# training auc? 
-
-predgbmmat <- prediction(predgbm, sppData$occurrence)
-perfgbmmat <- performance(predgbmmat, 'tpr', 'fpr')
-
-rocgbm <- data.frame(FalsePositive = perfgbmmat@x.values[[1]],
-                     TruePositive = perfgbmmat@y.values[[1]])
-
-ggplot(rocgbm, aes(x = FalsePositive, y = TruePositive)) +
-  geom_line(size = 1) +
-  labs(title = 'GBM ROC Curve',
-       x = 'False Positive Rate',
-       y = 'True Positive Rate') +
-  theme_classic()
-
-# partial dependence plots -------------------------------------------
-# pdp::partial needs a gbm object not gbm.step
-coastpdp <- 
-  gbmFinal %>%
-  pdp::partial(pred.var = 'HDI',
-               grid.resolution = 100,
-               n.trees = gbmFinal$n.trees,
-               prob = TRUE) 
-
-test <- 
-  gbmgbm %>% 
-  pdp::partial(pred.var = c('speciesdwarf', 'speciesgreen',
-                            'specieslarge', 'speciesnarrow',
-                            'speciessmall'),
-               grid.resolution = 100,
-               n.trees = gbmgbm$n.trees,
-               prob = TRUE)
-  
-
-  gbmFinal %>%
-  pdp::partial(pred.var = 'HDI',
-          n.trees = gbmFinal$n.trees,
-          grid.resolution = 100,
-          # gives the yaxis of the plot on the probably scale 
-          prob = TRUE) %>%
-  autoplot(rug = TRUE, train = sppData) +
-  theme_classic()
-
-
-# using gbm package ----------------------------------------------------
-
-# create hyperparameter grid
-hyperGrid <- expand.grid(
-  shrinkage = c(0.0001, 0.005, 0.01, 0.05, 0.08, 0.1),
-  interaction.depth = c(1, 3, 5, 7, 10),
-  n.minobsinnode = c(5, 8, 10, 15, 17),
-  # introduce stochastic gradient descent when bag.fraction < 1
-  bag.fraction = c(0.5, 0.7, 0.9),
-  optimal_trees = 0, # a place to dump results
-  min_rmse = 0) # a place to dump results
-
-# total number of combinations
-nrow(hyperGrid)
-
-# need to randomize data
-randomIndex <- sample(1:nrow(trainSpp), nrow(trainSpp))
-randomTrainSpp <- trainSpp[randomIndex, ]
-
-# randomize complete dataset
-randomI <- sample(1:nrow(sppProc), nrow(sppProc))
-randomSpp <- sppProc[randomI, ]
-
-# grid search
-for(i in 1:nrow(hyperGrid)) {
-  
-  # reproducibility
-  set.seed(123)
-  
-  # train model
-  gbmTune <- gbm(
-    formula = occurrence ~ .,
-    distribution = 'bernoulli',
-    data = randomSpp,
-    n.trees = 10000,
-    interaction.depth = hyperGrid$interaction.depth[i],
-    shrinkage = hyperGrid$shrinkage[i],
-    n.minobsinnode = hyperGrid$n.minobsinnode[i],
-    bag.fraction = hyperGrid$bag.fraction[i],
-    cv.folds = 10,
-    train.fraction = 0.75,
-    n.cores = NULL,
-    verbose = FALSE
-  )
-  
-  # add min training error and trees to grid
-  hyperGrid$optimal_trees[i] <- which.min(gbmTune$valid.error)
-  hyperGrid$min_rmse[i] <- sqrt(min(gbmTune$valid.error))
-}
-
-hyperGrid %>%
-  dplyr::arrange(min_rmse) %>%
-  head(10)
-
-
-summary(gbmFinal,
-        cBars = 10,
-        #method = permutation.test.gbm)
-        method = relative.influence)
-
-
-
-optTree <- gbm.perf(object = gbmFinal,
-                    method = 'cv',
-                    #method = 'OOB',
-                    plot.it = TRUE)
-
-pred <- predict.gbm(gbmFinal,
-                    newdat = testSpp,
-                    n.trees = 53,
-                    # this keeps the response bounded between 0 and 1
-                    type = 'response')
-
-# plot a ROC curve
-predMat <- prediction(pred, testSpp$occurrence)
-perfMat <- performance(predMat, 'tpr', 'fpr')
-
-ROCdf <- data.frame(FalsePositive = perfMat@x.values[[1]],
-                    TruePositive = perfMat@y.values[[1]])
-
-ggplot(ROCdf, aes(x = FalsePositive, y = TruePositive)) +
-  geom_line(size = 1) +
-  labs(title = 'GBM ROC Curve',
-       x = 'False Positive Rate',
-       y = 'True Positive Rate') +
-  theme_classic()
-
-aucGbm <- auc(actual = testSpp$occurrence, predicted = pred)
+# need to calculate predictive accuracy using Cohen's kappa for different value cut-offs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
