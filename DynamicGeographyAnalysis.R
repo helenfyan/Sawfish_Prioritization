@@ -31,6 +31,7 @@ pc_data <-
 # WITH FISHING ---------------------------------------------------------
 # ----------------------------------------------------------------------
 
+# model where fishing is binned
 mod_fishBin3 <- 
   brm(occurrence ~ logCoastLength*fishBin3,
       data = pc_data, 
@@ -43,6 +44,8 @@ summary(mod_fishBin3)
 
 get_variables(mod_fishBin3)
 
+plot(mod_fishBin3)
+
 # plot with draws ---------------
 set.seed(123)
 
@@ -50,8 +53,9 @@ fitlines_plot <-
   pc_data %>% 
   mutate(fishBin3 = factor(fishBin3, levels = c('Low', 'Moderate', 'High'))) %>% 
   group_by(fishBin3) %>% 
-  data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
-  add_fitted_draws(mod_fishBin3, n = 200) %>% 
+  # extend the lines beyond the limits of the data
+  data_grid(logCoastLength = seq_range(pc_data$logCoastLength, 101)) %>% 
+  add_fitted_draws(mod_fishBin3, n = 100) %>% 
   ggplot(aes(x = logCoastLength, y = occurrence, 
              colour = fishBin3)) +
   geom_line(aes(y = .value, group = paste(fishBin3, .draw)), alpha = 0.15) +
@@ -60,7 +64,8 @@ fitlines_plot <-
              colour = 'grey60', alpha = 0.7) +
   geom_smooth(data = pc_data, method = 'glm',
              method.args = list(family = 'binomial'),
-             se = FALSE, size = 1.5) +
+             se = FALSE, size = 1.5,
+             fullrange = TRUE) +
   scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
   labs(y = 'Occurrence', 
        x = 'log Coastline Length (km)',
@@ -71,10 +76,19 @@ fitlines_plot <-
         legend.position = c(0.02, 0.9)) +
   guides(colour = guide_legend(override.aes = list(size = 2,
                                                    alpha = 0.8))) +
+  # overlay the zero fishing pressure curve
+  geom_line(data = zero_df, aes(y = .value, group = .draw), alpha = 0.15,
+            colour = 'darkblue') +
+  geom_line(data = zero_pred, aes(x = logCoastLength, y = mean_value),
+            colour = 'darkblue', size = 1.5) +
   publication_theme()
 
 fitlines_plot
 
+
+ggplot(pc_data, aes(x = logProteinDiet, y = occurrence)) +
+  geom_smooth(method = 'glm', method.args = list(family = 'binomial')) +
+  geom_point(alpha = 0.2, size = 2)
 
 # plot of posterior distributions ---------------------------
 post_values <- 
@@ -126,7 +140,8 @@ make_density <-
 low <- 
   make_density('Low', '#fd8d3c', '#EEC5AA') +
   labs(y = 'Low') +
-  theme(axis.title.y = element_text(size = 13, colour = 'grey20', angle = 0, hjust = 0,
+  theme(axis.title.y = element_text(size = 13, 
+                                    colour = 'grey20', angle = 0, hjust = 0,
                                     vjust = 0.5))
   
 low
@@ -134,7 +149,8 @@ low
 mod <- 
   make_density('Moderate', '#FCA091', '#fc4e2a') +
   labs(y = 'Moderate') +
-  theme(axis.title.y = element_text(size = 13, colour = 'grey20', angle = 0, hjust = 0,
+  theme(axis.title.y = element_text(size = 13, 
+                                    colour = 'grey20', angle = 0, hjust = 0,
                                     vjust = 0.5))
 
 mod
@@ -143,7 +159,8 @@ high <-
   make_density('High', '#BE827E', '#bd0026') +
   theme(axis.line.x = element_line(colour = 'grey60'),
         axis.text.x = element_text(size = 13, colour = 'grey20'),
-        axis.title.y = element_text(size = 13, colour = 'grey20', angle = 0, hjust = 0,
+        axis.title.y = element_text(size = 13, colour = 'grey20', 
+                                    angle = 0, hjust = 0,
                                     vjust = 0.5)) +
   labs(y = 'High',
        x = 'Posterior Prediction')
@@ -154,39 +171,60 @@ high
 # WITHOUT FISHING ------------------------------------------------------
 # ----------------------------------------------------------------------
 
-mod_nofish <- 
-  brm(occurrence ~ logCoastLength,
+# model where fishing is kept continuous
+mod_fishcont <- 
+  brm(occurrence ~ logCoastLength*logProteinDiet,
       data = pc_data,
       family = 'bernoulli',
       seed = 123)
 
-#saveRDS(mod_nofish, '../../../ModelOutputs/DGNoFish_190910.rds')
-mod_nofish <- readRDS('../../../ModelOutputs/DGNoFish_190910.rds')
+#saveRDS(mod_fishcont, '../../../ModelOutputs/DGContinuous_191016.rds')
+mod_fishcont <- readRDS('../../../ModelOutputs/DGContinuous_191016.rds')
+summary(mod_fishcont)
 
-summary(mod_nofish)
+plot(mod_fishcont)
 
+get_variables(mod_fishcont)
+
+# simulate and predict data with zero fishing pressure
+zero_df <- 
+  pc_data %>% 
+  data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+  mutate(logProteinDiet = 0) %>% 
+  add_fitted_draws(mod_fishcont, n = 100)
+
+zero_df
+
+zero_pred <- 
+  zero_df %>% 
+  group_by(logCoastLength) %>% 
+  summarise(mean_value = mean(.value))
+
+zero_pred
 # fitlines plot ----------------------
 fitlines_nofish <- 
   pc_data %>% 
   data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
-  add_fitted_draws(mod_nofish, n = 200) %>% 
+  mutate(logProteinDiet = 0) %>% 
+  add_fitted_draws(mod_fishcont, n = 100) %>% 
   ggplot(aes(x = logCoastLength, y = occurrence)) +
   geom_line(aes(y = .value, group = paste(.draw)), alpha = 0.1,
             colour = 'darkblue') +
-  geom_point(data = pc_data, size = 4, shape = '|',
-             colour = 'grey60', alpha = 0.7) +
-  geom_smooth(data = pc_data,
-              method = 'glm', method.args = list(family = 'binomial'),
-              se = FALSE, colour = 'darkblue',
-              size = 1.5) +
+  #geom_point(data = pc_data, size = 4, shape = '|',
+  #           colour = 'grey60', alpha = 0.7) +
+  geom_line(data = zero_pred, aes(x = logCoastLength, y = mean_value),
+            colour = 'darkblue',
+            size = 1.5) +
   scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank()) +
+  #theme(axis.title.x = element_blank(),
+        #axis.text.x = element_blank()) +
+  labs(y = 'Occurrence') +
   publication_theme()
   
 
 fitlines_nofish
 
+# fitlines plot for all fishing pressures 
 fitlines_all <- 
   plot_grid(fitlines_nofish, fitlines_plot, ncol = 1,
             align = 'v', scale = 1)
@@ -195,7 +233,7 @@ fitlines_all
 
 #posterior distrbution plot --------------
 post_values_nofish <- 
-  posterior_samples(mod_nofish, '^b') %>% 
+  posterior_samples(mod_fishcont, '^b') %>% 
   dplyr::select('b_Intercept')
 
 basic_dens <- 
@@ -205,13 +243,13 @@ basic_dens <-
                 y = c(0, 0.4)) +
   geom_vline(xintercept = 0, linetype = 'dashed', colour = 'grey60',
              size = 0.7) +
-  theme(axis.text = element_blank(),
+  theme(#axis.text = element_blank(),
         axis.line.y = element_line(colour = 'grey60'),
         axis.line.x = element_line(colour = 'grey60'),
         panel.grid = element_blank(),
         panel.background = element_blank(),
         axis.title.x = element_blank(),
-        axis.ticks = element_blank(),
+   #     axis.ticks = element_blank(),
         axis.title.y = element_text(size = 13, colour = 'grey20', angle = 0, hjust = 0,
                                     vjust = 0.5)) +
   labs(y = 'No Fishing')
