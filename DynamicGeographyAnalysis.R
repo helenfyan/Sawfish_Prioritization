@@ -7,6 +7,9 @@ library(tidybayes)
 library(brms)
 library(ggstance)
 library(cowplot)
+library(RColorBrewer)
+#library(bayesplot) # loaded by other packages
+
 
 rstan_options(auto_write = TRUE)
 options(mc.cores = 4)
@@ -44,7 +47,38 @@ summary(mod_fishBin3)
 
 get_variables(mod_fishBin3)
 
-plot(mod_fishBin3)
+
+# traceplot of posteriors ----------------------------------------
+post_trace <- as.array(mod_fishBin3)
+
+trace_labels <- 
+  c('b_logCoastLength' = 'Coastline Length',
+    'b_fishBin3Low' = 'Low Fishing',
+    'b_fishBin3Moderate' = 'Moderate Fishing',
+    'b_Intercept' = 'High Fishing')
+
+bayesplot::color_scheme_set('blue')
+trace_plots <- 
+  bayesplot::mcmc_trace(post_trace, pars = c('b_logCoastLength',
+                                             'b_fishBin3Low',
+                                             'b_fishBin3Moderate',
+                                             'b_Intercept'),
+                        facet_args = list(ncol = 1, strip.position = 'left',
+                                          labeller = as_labeller(trace_labels))) +
+  theme(strip.placement = 'outside',
+        strip.background = element_blank(),
+        strip.text = element_text(vjust = 0.8, colour = 'grey20',
+                                  size = 12),
+        legend.text = element_text(colour = 'grey20'),
+        legend.title = element_text(colour = 'grey20')) +
+  publication_theme() +
+  labs(y = 'Coefficients') +
+  guides(colour = guide_legend(override.aes = list(size = 2)))
+
+trace_plots
+
+#ggsave('../../../Figures/EcoCarryCapacity/TracePlot_191017.pdf', trace_plots,
+#       height = 22, width = 30.58, units = c('cm'))
 
 # plot with draws ---------------
 set.seed(123)
@@ -70,44 +104,51 @@ fitlines_plot <-
   labs(y = 'Occurrence', 
        x = 'log Coastline Length (km)',
        colour = 'Fishing Pressure') +
-  theme(legend.key = element_rect(fill = NA),
-        legend.title = element_text(size = 14, colour = 'grey20'),
-        legend.text = element_text(size = 13, colour = 'grey20'),
-        legend.position = c(0.02, 0.9)) +
-  guides(colour = guide_legend(override.aes = list(size = 2,
-                                                   alpha = 0.8))) +
+  theme(legend.position = 'none') +
+  #theme(legend.key = element_rect(fill = NA),
+  #      legend.title = element_text(size = 14, colour = 'grey20'),
+  #      legend.text = element_text(size = 13, colour = 'grey20'),
+  #      legend.position = c(0.02, 0.9)) +
+  #guides(colour = guide_legend(override.aes = list(size = 2,
+  #                                                 alpha = 0.8))) +
   # overlay the zero fishing pressure curve
-  geom_line(data = zero_df, aes(y = .value, group = .draw), alpha = 0.15,
-            colour = 'darkblue') +
-  geom_line(data = zero_pred, aes(x = logCoastLength, y = mean_value),
-            colour = 'darkblue', size = 1.5) +
+  # first need to load the data below
+  #geom_line(data = zero_df, aes(y = .value, group = .draw), alpha = 0.15,
+  #          colour = 'darkblue') +
+  #geom_line(data = zero_pred, aes(x = logCoastLength, y = mean_value),
+  #          colour = 'darkblue', size = 1.5) +
   publication_theme()
 
 fitlines_plot
 
-
-ggplot(pc_data, aes(x = logProteinDiet, y = occurrence)) +
-  geom_smooth(method = 'glm', method.args = list(family = 'binomial')) +
-  geom_point(alpha = 0.2, size = 2)
+#ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191017.pdf',
+#       height = 20, width = 30, units = c('cm'))
 
 # plot of posterior distributions ---------------------------
 post_values <- 
   posterior_samples(mod_fishBin3, '^b') %>% 
-  dplyr::select(b_Intercept, b_fishBin3Low, b_fishBin3Moderate) %>% 
+  dplyr::select(b_Intercept, b_fishBin3Low, b_fishBin3Moderate,
+                b_logCoastLength) %>% 
+  # add beta coefficients to b_Intercept b/c categorical variable
+  mutate(b_fishBin3Moderate = b_fishBin3Moderate + b_Intercept,
+         b_fishBin3Low = b_fishBin3Low + b_Intercept) %>% 
   dplyr::rename('High' = 'b_Intercept',
                 'Moderate' = 'b_fishBin3Moderate',
-                'Low' = 'b_fishBin3Low') %>% 
-  gather(key = fishing, value = post_pred) %>% 
-  mutate(fishing = factor(fishing, levels = c('Low', 'Moderate', 'High')))
+                'Low' = 'b_fishBin3Low',
+                'Coastline Length' = 'b_logCoastLength') %>% 
+  gather(key = intercept, value = post_pred) %>% 
+  mutate(intercept = factor(intercept, levels = c('Coastline Length',
+                                                  'Low', 'Moderate', 'High')))
   
+head(post_values)
 # to colour based on overlap with zero ------------------------
 make_density <- 
-  function(fishing_pressure, colour_right, colour_left) {
+  function(intercept_value, colour_right, colour_left) {
     
     # make basic plot to build on
     basic_dens <- 
       post_values %>% 
-      dplyr::filter(fishing == fishing_pressure) %>% 
+      dplyr::filter(intercept == intercept_value) %>% 
       ggplot(aes(x = post_pred)) +
       geom_density(fill = colour_right, colour = 'grey90') +
       expand_limits(x = c(-23, 23),
@@ -137,8 +178,17 @@ make_density <-
     
   }
 
+coast <- 
+  make_density('Coastline Length', 'darkblue', 'lightblue') +
+  labs(y = 'Coastline Length') +
+  theme(axis.title.y = element_text(size = 13, 
+                                    colour = 'grey20', angle = 0, hjust = 0,
+                                    vjust = 0.5))
+
+coast
+
 low <- 
-  make_density('Low', '#fd8d3c', '#EEC5AA') +
+  make_density('Low', '#EEC5AA', '#fd8d3c') +
   labs(y = 'Low') +
   theme(axis.title.y = element_text(size = 13, 
                                     colour = 'grey20', angle = 0, hjust = 0,
@@ -210,14 +260,14 @@ fitlines_nofish <-
   ggplot(aes(x = logCoastLength, y = occurrence)) +
   geom_line(aes(y = .value, group = paste(.draw)), alpha = 0.1,
             colour = 'darkblue') +
-  #geom_point(data = pc_data, size = 4, shape = '|',
-  #           colour = 'grey60', alpha = 0.7) +
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
   geom_line(data = zero_pred, aes(x = logCoastLength, y = mean_value),
             colour = 'darkblue',
             size = 1.5) +
   scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
-  #theme(axis.title.x = element_blank(),
-        #axis.text.x = element_blank()) +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank()) +
   labs(y = 'Occurrence') +
   publication_theme()
   
@@ -243,13 +293,13 @@ basic_dens <-
                 y = c(0, 0.4)) +
   geom_vline(xintercept = 0, linetype = 'dashed', colour = 'grey60',
              size = 0.7) +
-  theme(#axis.text = element_blank(),
+  theme(axis.text = element_blank(),
         axis.line.y = element_line(colour = 'grey60'),
         axis.line.x = element_line(colour = 'grey60'),
         panel.grid = element_blank(),
         panel.background = element_blank(),
         axis.title.x = element_blank(),
-   #     axis.ticks = element_blank(),
+        axis.ticks = element_blank(),
         axis.title.y = element_text(size = 13, colour = 'grey20', angle = 0, hjust = 0,
                                     vjust = 0.5)) +
   labs(y = 'No Fishing')
@@ -270,13 +320,33 @@ nofish_plot
 all_density <- 
   plot_grid(nofish_plot, low, mod, high, ncol = 1, align = 'v', scale = 1)
 
-all_density
 all_density2 <- ggdraw(add_sub(all_density, 'Posterior Prediction', hjust = 0.1))
+all_density2
 
+
+# now combine all density plots and fitlines plots
+# this has fishing pressures AND zero fishing
 all_plots <- 
   plot_grid(fitlines_all, all_density2, ncol = 2)
 
 all_plots
 
-ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191010.pdf', all_plots,
+ggsave('../../../Figures/EcoCarryCapacity/DynamicGeographyZeroFish_191017.pdf', all_plots,
        height = 20, width = 30, units = c('cm'))
+
+# without zero fishing
+allfish_density_unlabelled <- 
+  plot_grid(low, mod, high, ncol = 1, align = 'v', scale = 1)
+
+
+allfish_density <- 
+  ggdraw(add_sub(allfish_density_unlabelled, 'Posterior Prediction', hjust = 0.1))
+
+allfish_all_plots <- 
+  plot_grid(fitlines_plot, allfish_density, ncol = 2,
+            scale = 1)
+
+allfish_all_plots
+
+ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191017.pdf',
+       allfish_all_plots, height = 20, width = 40, units = c('cm'))
