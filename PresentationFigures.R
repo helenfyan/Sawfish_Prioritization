@@ -188,7 +188,7 @@ setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/gbm out/')
 dark_theme <- function(axis_text_size = 13, axis_y_ticks = element_line()) {
   theme(panel.grid = element_blank(),
         panel.background = element_rect(fill = '#080818', colour = '#080818'),
-        plot.background = element_rect(fill = '#080818', colour = 'white', size = 1),
+        plot.background = element_rect(fill = '#080818', colour = '#080818', size = 1),
         axis.title.x = element_text(colour = 'white', size = 18),
         axis.title.y = element_text(colour = 'white', size = 18),
         axis.line = element_line(colour = 'white'),
@@ -297,3 +297,180 @@ hdiplot <-
 print(hdiplot)
 ggsave('../Presentations/IDEAS/PDPHDI.pdf', hdiplot, 
        height = 17.06, width = 15.51, units = c('cm'))
+
+
+#  --------------------------------------------------------------------------------
+# ECO/EVO figures -----------------------------------------------------------------
+#  --------------------------------------------------------------------------------
+
+# load dark theme from above
+library(tidybayes)
+library(modelr)
+
+pc_data <- 
+  read_csv('../../../Datasets/DynamicGeographyBinned_190925.csv') %>% 
+  mutate(fishBin3 = dplyr::recode(fishBin3,
+                                  'low' = 'Low',
+                                  'moderate' = 'Moderate',
+                                  'high' = 'High'))
+
+mod_fishBin3 <- readRDS('../../../ModelOutputs/DGBinned_190925.rds')
+summary(mod_fishBin3)
+
+get_variables(mod_fishBin3)
+
+
+
+# plot with draws ---------------
+set.seed(123)
+
+fitlines_plot <- 
+  pc_data %>% 
+  mutate(fishBin3 = factor(fishBin3, levels = c('Low', 'Moderate', 'High'))) %>% 
+  group_by(fishBin3) %>% 
+  # extend the lines beyond the limits of the data
+  data_grid(logCoastLength = seq_range(pc_data$logCoastLength, 101)) %>% 
+  add_fitted_draws(mod_fishBin3, n = 100) %>% 
+  ggplot(aes(x = logCoastLength, y = occurrence, 
+             colour = fishBin3)) +
+  geom_line(aes(y = .value, group = paste(fishBin3, .draw)), alpha = 0.2,
+            size = 0.8) +
+  scale_colour_manual(values = c('#fd8d3c', '#fc4e2a', '#bd0026')) + 
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pc_data, method = 'glm',
+              method.args = list(family = 'binomial'),
+              se = FALSE, size = 2,
+              fullrange = TRUE) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  labs(y = 'Occupancy', 
+       x = 'Habitat availability (coastline length (km))') +
+  theme(legend.position = 'none') +
+  dark_theme()
+
+fitlines_plot
+
+# just low fising ----
+set.seed(123)
+low_df <- 
+  pc_data %>% 
+  group_by(fishBin3) %>% 
+  data_grid(logCoastLength = seq_range(pc_data$logCoastLength, 101)) %>% 
+  add_fitted_draws(mod_fishBin3, n = 100) %>% 
+  dplyr::filter(fishBin3 == 'Low')
+
+fitlines_low <- 
+  pc_data %>% 
+  ggplot(aes(x = logCoastLength, y = occurrence,
+             colour = fishBin3)) +
+  geom_point(size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(method = 'glm',
+              method.args = list(family = 'binomial'),
+              se = FALSE, size = 2,
+              fullrange = TRUE) +
+  scale_colour_manual(values = c('#080818', '#fd8d3c', '#080818')) +
+  geom_line(data = low_df, aes(y = .value, group = paste(.draw)), alpha = 0.2,
+            size = 0.8, colour = '#fd8d3c') +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  labs(y = 'Occupancy', 
+       x = 'Habitat availability (coastline length (km))') +
+  theme(legend.position = 'none') +
+  dark_theme()
+
+fitlines_low
+
+ggsave('../../../Presentations/EcoEvo/LowFishing_191023.png',
+       fitlines_low, 
+       height = 20, width = 30, units = c('cm'),
+       bg = '#080818')
+
+# just mod fishing ----
+set.seed(123)
+low_df <- 
+  pc_data %>% 
+  group_by(fishBin3) %>% 
+  data_grid(logCoastLength = seq_range(pc_data$logCoastLength, 101)) %>% 
+  add_fitted_draws(mod_fishBin3, n = 100) %>% 
+  dplyr::filter(fishBin3 %in% c('Low', 'Moderate'))
+
+mod <- 
+  pc_data %>% 
+  dplyr::filter(fishBin3 %in% c('Low', 'Moderate'))
+
+fitlines_plot <- 
+  ggplot(pc_data, aes(x = logCoastLength, y = occurrence,
+                      colour = fishBin3)) +
+  geom_point(size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = mod, 
+              aes(colour = fishBin3),
+              method = 'glm',
+              method.args = list(family = 'binomial'),
+              se = FALSE, size = 2,
+              fullrange = TRUE) +
+  #scale_colour_manual(values = c('#fd8d3c', '#fc4e2a')) +
+  geom_line(data = low_df, aes(y = .value, group = paste(fishBin3, .draw)), alpha = 0.2,
+            size = 0.8) +
+  scale_colour_manual(values = c('#fd8d3c', '#fc4e2a')) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  labs(y = 'Occupancy', 
+       x = 'Habitat availability (coastline length (km))') +
+  theme(legend.position = 'none') +
+  dark_theme()
+
+fitlines_plot
+
+ggsave('../../../Presentations/EcoEvo/ModFishing_191023.png',
+       fitlines_plot, 
+       height = 20, width = 30, units = c('cm'),
+       bg = '#080818')
+
+# -------------------------------------------
+set.seed(123)
+fitlines_plot <- 
+  pc_data %>% 
+  mutate(fishBin3 = factor(fishBin3, levels = c('Low', 'Moderate', 'High'))) %>% 
+  group_by(fishBin3) %>% 
+  # extend the lines beyond the limits of the data
+  data_grid(logCoastLength = seq_range(pc_data$logCoastLength, 101)) %>% 
+  add_fitted_draws(mod_fishBin3, n = 100) %>% 
+  ggplot(aes(x = logCoastLength, y = occurrence, 
+             colour = fishBin3)) +
+  geom_line(aes(y = .value, group = paste(fishBin3, .draw)), alpha = 0.2,
+            size = 0.8) +
+  scale_colour_manual(values = c('#fd8d3c', '#fc4e2a', '#bd0026')) + 
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pc_data, method = 'glm',
+              method.args = list(family = 'binomial'),
+              se = FALSE, size = 2,
+              fullrange = TRUE) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  labs(y = 'Occupancy', 
+       x = 'Habitat availability (coastline length (km))') +
+  theme(legend.position = 'none') +
+  dark_theme()
+
+fitlines_plot
+
+ggsave('../../../Presentations/EcoEvo/HighFishing_191023.png',
+       fitlines_plot, 
+       height = 20, width = 30, units = c('cm'),
+       bg = '#080818')
+
+fitlines_points <- 
+  ggplot(pc_data, aes(x = logCoastLength, y = occurrence)) +
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  labs(y = 'Occupancy', 
+       x = 'Habitat availability (coastline length (km))') +
+  dark_theme()
+
+fitlines_points
+
+ggsave('../../../Presentations/EcoEvo/JustPoints_191023.png',
+       fitlines_points, 
+       height = 20, width = 30, units = c('cm'),
+       bg = '#080818')
