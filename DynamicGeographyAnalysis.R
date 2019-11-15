@@ -331,7 +331,8 @@ all_plots <-
 
 all_plots
 
-ggsave('../../../Figures/EcoCarryCapacity/DynamicGeographyZeroFish_191017.pdf', all_plots,
+ggsave('../../../Figures/EcoCarryCapacity/DynamicGeographyZeroFish_191017.pdf', 
+       all_plots,
        height = 20, width = 30, units = c('cm'))
 
 # without zero fishing
@@ -350,3 +351,171 @@ allfish_all_plots
 
 ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191017.pdf',
        allfish_all_plots, height = 20, width = 40, units = c('cm'))
+
+# -------------------------------------------------------------------------
+# Make fitlines plot and predict each of the curves using cont model ------
+# -------------------------------------------------------------------------
+
+# protein consumption
+QsProtein <- summary(pc_data$logProteinDiet)
+QminP <- QsProtein[1]
+Q1P <- QsProtein[2]
+Q2P <- QsProtein[3]
+Q3P <- QsProtein[5]
+QmaxP <- QsProtein[6]
+
+quarts <- 
+  lapply(c(QminP, Q1P, Q2P, Q3P, QmaxP), function(x) {
+    
+    set.seed(123)
+    
+    qs_df <- 
+      pc_data %>% 
+      data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+      mutate(logProteinDiet = paste(x),
+             logProteinDiet = as.numeric(logProteinDiet)) %>% 
+      add_fitted_draws(mod_fishcont, n = 110)
+    
+    return(qs_df)
+    
+  })
+
+# bind all of them together
+pred_qsP <- 
+  rbind(quarts[[1]], quarts[[2]], quarts[[3]], quarts[[4]], quarts[[5]])
+
+# calculate means to draw mean line
+pred_meansP <- 
+  pred_qsP %>% 
+  group_by(logProteinDiet, logCoastLength) %>% 
+  summarise(mean_val = mean(.value))
+
+# plot this badboy
+preds_fitlines_protein <- 
+  #ggplot(pred_qsP, aes(x = logCoastLength, y = occurrence, 
+  #                    colour = factor(logProteinDiet))) +
+  # change it so there are no posterior draws for zero and max
+  pred_qsP %>% 
+  dplyr::filter(!logProteinDiet %in% c(QminP, QmaxP)) %>% 
+  ggplot(aes(x = logCoastLength, y = occurrence,
+             colour = factor(logProteinDiet))) +
+  geom_line(aes(y = .value, group = paste(logProteinDiet, .draw)), 
+            alpha = 0.15) +
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pred_meansP, aes(x = logCoastLength, y = mean_val,
+                                     colour = factor(logProteinDiet)),
+              se = FALSE, fullrange = TRUE,
+              method = 'glm', 
+              method.args = list(family = 'quasibinomial'),
+              size = 1) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme(legend.key = element_rect(fill = NA),
+        legend.title = element_text(size = 14, colour = 'grey20'),
+        legend.text = element_text(size = 13, colour = 'grey20')) +
+  guides(colour = guide_legend(override.aes = list(size = 2,
+                                                   alpha = 0.8))) +
+  scale_colour_manual(values = c('darkblue', '#fd8d3c',
+                                 '#fc4e2a', '#e31a1c',
+                                 '#800026'),
+                      name = 'Fishing\npressure',
+                      labels = c('Zero',
+                                 'Low',
+                                 'Moderate',
+                                 'High',
+                                 'Maximum')) +
+  publication_theme() +
+  labs(y = 'Occupancy',
+       x = 'log Coastline length',
+       title = 'Fishing pressure = protein consumption')
+  
+
+preds_fitlines_protein
+
+ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191114.pdf',
+       preds_fitlines_protein, height = 20, width = 25, units = c('cm'))
+
+# do the same for gear-specific landings ---------------------------------------
+# make a model with gear-specific landings
+mod_gearcont <- 
+  brm(occurrence ~ logCoastLength*logtotalGearTonnes,
+       data = pc_data,
+       family = 'bernoulli',
+       seed = 123)
+
+#saveRDS(mod_gearcont, '../../../ModelOutputs/DGContinuousGear_191104.rds')
+mod_gearcont <- readRDS('../../../ModelOutputs/DGContinuousGear_191104.rds')
+summary(mod_gearcont)
+plot(mod_gearcont)
+
+# fishery landings
+QsGear <- summary(pc_data$logtotalGearTonnes)
+QminG <- QsGear[1]
+Q1G <- QsGear[2]
+Q2G <- QsGear[3]
+Q3G <- QsGear[5]
+QmaxG <- QsGear[6]
+
+
+quartsG <- 
+  lapply(c(QminG, Q1G, Q2G, Q3G, QmaxG), function(x) {
+    
+    set.seed(123)
+    
+    qs_df <- 
+      pc_data %>% 
+      data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+      mutate(logtotalGearTonnes = paste(x),
+             logtotalGearTonnes = as.numeric(logtotalGearTonnes)) %>% 
+      add_fitted_draws(mod_gearcont, n = 110)
+    
+    return(qs_df)
+    
+  })
+
+# bind all of them together
+pred_qsG <- 
+  rbind(quartsG[[1]], quartsG[[2]], quartsG[[3]], quartsG[[4]], quartsG[[5]])
+
+# calculate means to draw mean line
+pred_meansG <- 
+  pred_qsG %>% 
+  group_by(logtotalGearTonnes, logCoastLength) %>% 
+  summarise(mean_val = mean(.value))
+
+# plot with gear-restricted landings
+preds_fitlines_gear <- 
+  ggplot(pred_qsG, aes(x = logCoastLength, y = occurrence, 
+                       colour = factor(logtotalGearTonnes))) +
+  geom_line(aes(y = .value, group = paste(logtotalGearTonnes, .draw)), 
+            alpha = 0.15) +
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pred_meansG, aes(x = logCoastLength, y = mean_val,
+                                      colour = factor(logtotalGearTonnes)),
+              se = FALSE, fullrange = TRUE,
+              method = 'glm', 
+              method.args = list(family = 'quasibinomial')) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme(legend.key = element_rect(fill = NA),
+        legend.title = element_text(size = 14, colour = 'grey20'),
+        legend.text = element_text(size = 13, colour = 'grey20')) +
+  guides(colour = guide_legend(override.aes = list(size = 2,
+                                                   alpha = 0.8))) +
+  scale_colour_manual(values = c('#fed976', '#fd8d3c',
+                                 '#fc4e2a', '#e31a1c',
+                                 '#800026'),
+                      name = 'Fishing\npressure',
+                      labels = c('Zero',
+                                 'Low',
+                                 'Moderate',
+                                 'High',
+                                 'Maximum')) +
+  publication_theme() +
+  labs(y = 'Occupancy',
+       x = 'log Coastline length',
+       title = 'Gear-restricted landings')
+
+preds_fitlines_gear
+
+
