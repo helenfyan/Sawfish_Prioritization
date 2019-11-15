@@ -3,6 +3,8 @@
 library(tidyverse)
 library(irr)
 
+setwd('../../../ModelOutputs/GBM/')
+
 # read in all of the .csv files
 files_raw <- list.files(pattern = '191011_CvGBMTestPred_*')
 
@@ -74,10 +76,40 @@ kappa_30
 str(kappa_30)
 kappa_30$value
 
+# I want to group_by RunNo and calculate the kappa between the
+# true occurrence and the predicted cutoff
+# so I want a df with a column RunNo, pred cut-off, and kapa number
+
+long_cutoff <- 
+  cutoff_data %>% 
+  dplyr::select(-ISO3, -PredValue) %>% 
+  gather(key = pred_value, value = measurement, -occurrence, -RunNo)
+
+head(long_cutoff)
+
+kappa_calc <- 
+  long_cutoff %>% 
+  group_by(RunNo, pred_value) %>% 
+  do(kappa2())
+
+# this works! Lit try to extract the kappa value to put into it's own dataframe
+test <- 
+  long_cutoff %>% 
+  dplyr::filter(pred_value == 'Pred_30') %>% 
+  select(occurrence, measurement) %>% 
+  as.data.frame() %>% 
+  kappa2(.)
+
+
+
+str(test)
+
+kappa_table <- data.frame()
 new_kappa <- data.frame()
 
 all_kappas <- 
-  lapply(c('Pred_30', 'Pred_35', 'Pred_40', 'Pred_45', 'Pred_50'), function(x) {
+  lapply(c('Pred_30', 'Pred_35', 'Pred_40', 'Pred_45', 'Pred_50'), 
+         function(x) {
     
     # select column occurrence and cutoff 
     df <- 
