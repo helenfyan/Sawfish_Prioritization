@@ -597,7 +597,6 @@ bayesplot::mcmc_areas(posterior,
                       prob = 0.95)
 
 
-# let's try to run this shit frequentist?
 
 
 
@@ -618,45 +617,57 @@ mod <- nls(occurrence ~ 1/(1 + exp(a - b*logCoastLength)),
 
 
 
-
-
-#simulate some data
-set.seed(20160227)
-x<-seq(0,50,1)
-
-#intercept set at -10
-y<-(((runif(1,10,20)*x)/(runif(1,0,10)+x))+rnorm(51,0,1)-10)
-#for simple models nls find good starting values for the parameters even 
-#if it throw a warning
-m<-nls(y~(a*x/(b+x))+c,
-       start = list(a = 1, b = 1, c=-2))
-#get some estimation of goodness of fit
-cor(y,predict(m))
-
-#plot
-plot(x,y)
-lines(x,predict(m),lty=2,col="red",lwd=3)
-
-summary(m)
+# -------------------------------------------------------------------------
+# NLS model with extra intercept value ------------------------------------
+# -------------------------------------------------------------------------
 
 set.seed(123)
 mod <- nls(occurrence ~ (1/(1 + exp(a - b_c*logCoastLength) + b_f*logProteinDiet)) + c,
            data = pc_data,
            start = list(a = 0.1, b_c = 0.2, b_f = 0.1, c = 0.1))
 
-mod <- nls(occurrence ~ (1/(1 + exp(a - b_c*logCoastLength))) + c,
-           data = pc_data,
-           start = list(a = 0.1, b_c = 0.2, c = 0.1))
-
 summary(mod)
 
-plot(occurrence ~ logCoastLength, pc_data)
-lines(pc_data$logCoastLength, predict(mod))
+# nasty baseplot stuff but whatever ---------------------
+x <- seq(min(0), max(pc_data$logCoastLength), length = 100)
+y0 <- predict(mod, list(logCoastLength = x, logProteinDiet = 0))
+y1 <- predict(mod, list(logCoastLength = x, logProteinDiet = 0.5))
+y2 <- predict(mod, list(logCoastLength = x, logProteinDiet = 1))
+y3 <- predict(mod, list(logCoastLength = x, logProteinDiet = 1.5))
+y4 <- predict(mod, list(logCoastLength = x, logProteinDiet = 2.5))
+
+plot(occurrence ~ logCoastLength, pc_data, xlim = c(2, 12),
+     col = 'grey60', pch = '|')
+points(x, y0, type = 'l', col = 'darkblue', lwd = 2)
+points(x, y1, type = 'l', col = '#fd8d3c', lwd = 2)
+points(x, y2, type = 'l', col = '#fc4e2a', lwd = 2)
+points(x, y3, type = 'l', col = '#e31a1c', lwd = 2)
+points(x, y4, type = 'l', col = '#800026', lwd = 2)
 
 
+coefs <- 
+  data.frame(summary(mod)$parameters) %>% 
+  dplyr::select(Estimate, Std..Error) %>% 
+  rownames_to_column('Coefficients') %>% 
+  mutate(Coefficients = dplyr::recode(Coefficients,
+                                      'c' = 'New_intercept',
+                                      'b_f' = 'Beta_fishing',
+                                      'b_c' = 'Beta_coastline',
+                                      'a' = 'Beta')) %>% 
+  ggplot(aes(x = Estimate, y = Coefficients)) +
+  geom_point(size = 4, colour = 'darkslategray') +
+  geom_vline(xintercept = 0,
+             linetype = 2,
+             colour = 'grey40') +
+  geom_errorbarh(aes(xmin = Estimate - Std..Error, xmax = Estimate + Std..Error),
+                 height = 0,
+                 colour = 'darkslategray') +
+  labs(y = '',
+       title = 'NLS Coefficients with mean estimate ± SE') +
+  theme_classic()
 
+coefs
 
-
-
-
+ggsave('../../../Figures/EcoCarryCapacity/NLS_coefplot_191119.pdf', coefs,
+       width = 28, height = 20, units = c('cm'))
 
