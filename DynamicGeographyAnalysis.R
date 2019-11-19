@@ -519,3 +519,144 @@ preds_fitlines_gear <-
 preds_fitlines_gear
 
 
+# -------------------------------------------------------------------------
+# Re-write continuous model with intercept term and STAN ------------------
+# -------------------------------------------------------------------------
+library(bayesplot)
+
+stan_cont <- "
+  data {
+    int N;
+    vector[N] logCoastLength;
+    //int<lower = 0, upper = 1> occurrence[N];
+  }
+  
+  parameters {
+    real alpha;
+    real b_coast;
+    
+  }
+  
+  model {
+    
+    occurrence ~ (1 / (1 + exp(alpha - b_coast*logCoastLength)));
+    //occurrence ~ bernoulli(inv_logit(alpha + b_coast*logCoastLength));
+   
+  }
+  
+"
+
+stan_data <- 
+  list(N = nrow(pc_data),
+       logCoastLength = pc_data$logCoastLength,
+       occurrence = pc_data$occurrence)
+       #logCoastPop = pc_data$logCoastPop)
+
+
+mod_stan_cont <- stan(model_code = stan_cont,
+                      data = stan_data,
+                      chains = 2,
+                      iter = 2000,
+                      pars = c('alpha', 'b_coast', 'c'))
+
+y = 1 / (1 + exp[a - bx] ) + c
+
+stan_cont <- "
+  data {
+    int N;
+    vector[N] logCoastLength;
+    int<lower = 0, upper = 1> occurrence;
+  }
+  
+  parameters {
+    real alpha;
+    real b_coast;
+    real c;
+  }
+  
+  model {
+    occurrence ~ bernoulli_logit(alpha + b_coast * logCoastLength) + c;
+  }
+  
+"
+
+
+
+
+
+stan_data <- 
+  list(N = nrow(pc_data),
+       logCoastLength = pc_data$logCoastLength,
+       logProteinDiet = pc_data$logProteinDiet,
+       occurrence = pc_data$occurrence)
+
+summary(mod_stan_cont)
+posterior <- as.matrix(mod_stan_cont)
+bayesplot::mcmc_areas(posterior,
+                      pars = c('alpha', 'b_coast', 'sigma'),
+                      prob = 0.95)
+
+
+# let's try to run this shit frequentist?
+
+
+
+
+
+
+
+
+
+  y = 1 / (1 + exp[a - bx] ) + c
+
+
+mod <- nls(occurrence ~ 1/(1 + exp(a - b*logCoastLength)),
+           data = pc_data, a = 1, b = 1)
+
+mod <- nls(occurrence ~ 1/(1 + exp(a - b*logCoastLength)),
+           data = pc_data, start = list(a = 1, b = 1))
+
+
+
+
+
+#simulate some data
+set.seed(20160227)
+x<-seq(0,50,1)
+
+#intercept set at -10
+y<-(((runif(1,10,20)*x)/(runif(1,0,10)+x))+rnorm(51,0,1)-10)
+#for simple models nls find good starting values for the parameters even 
+#if it throw a warning
+m<-nls(y~(a*x/(b+x))+c,
+       start = list(a = 1, b = 1, c=-2))
+#get some estimation of goodness of fit
+cor(y,predict(m))
+
+#plot
+plot(x,y)
+lines(x,predict(m),lty=2,col="red",lwd=3)
+
+summary(m)
+
+set.seed(123)
+mod <- nls(occurrence ~ (1/(1 + exp(a - b_c*logCoastLength) + b_f*logProteinDiet)) + c,
+           data = pc_data,
+           start = list(a = 0.1, b_c = 0.2, b_f = 0.1, c = 0.1))
+
+mod <- nls(occurrence ~ (1/(1 + exp(a - b_c*logCoastLength))) + c,
+           data = pc_data,
+           start = list(a = 0.1, b_c = 0.2, c = 0.1))
+
+summary(mod)
+
+plot(occurrence ~ logCoastLength, pc_data)
+lines(pc_data$logCoastLength, predict(mod))
+
+
+
+
+
+
+
+
