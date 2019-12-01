@@ -7,9 +7,8 @@ library(tidybayes)
 library(brms)
 library(ggstance)
 library(cowplot)
-library(RColorBrewer)
-#library(bayesplot) # loaded by other packages
-
+library(gridExtra)
+library(fishualize)
 
 rstan_options(auto_write = TRUE)
 options(mc.cores = 4)
@@ -222,135 +221,88 @@ high
 # ----------------------------------------------------------------------
 
 # model where fishing is kept continuous
-mod_fishcont <- 
-  brm(occurrence ~ logCoastLength*logProteinDiet,
+mod_fishcont_int <- 
+  brm(occurrence ~ logCoastLength * logProteinDiet,
       data = pc_data,
       family = 'bernoulli',
       seed = 123)
 
-#saveRDS(mod_fishcont, '../../../ModelOutputs/DGContinuous_191016.rds')
-mod_fishcont <- readRDS('../../../ModelOutputs/DGContinuous_191016.rds')
+#saveRDS(mod_fishcont_int, '../../../ModelOutputs/DGContinuous_191016.rds')
+mod_fishcont_int <- readRDS('../../../ModelOutputs/DGContinuous_191016.rds')
+summary(mod_fishcont_int)
+
+plot(mod_fishcont_int)
+
+mod_fishcont <- 
+  brm(occurrence ~ logCoastLength + logProteinDiet,
+      data = pc_data,
+      family = 'bernoulli',
+      seed = 123)
+
+#saveRDS(mod_fishcont, '../../../ModelOutputs/DGContinuous_191130.rds')
+mod_fishcont <- readRDS('../../../ModelOutputs/DGContinuous_191130.rds')
 summary(mod_fishcont)
 
 plot(mod_fishcont)
 
+# lower LOOIC values demonstrate a better fit
+loo(mod_fishcont)
+loo(mod_fishcont_int)
+
 get_variables(mod_fishcont)
 
-# simulate and predict data with zero fishing pressure
-zero_df <- 
-  pc_data %>% 
-  data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
-  mutate(logProteinDiet = 0) %>% 
-  add_fitted_draws(mod_fishcont, n = 100)
-
-zero_df
-
-zero_pred <- 
-  zero_df %>% 
-  group_by(logCoastLength) %>% 
-  summarise(mean_value = mean(.value))
-
-zero_pred
-# fitlines plot ----------------------
-fitlines_nofish <- 
-  pc_data %>% 
-  data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
-  mutate(logProteinDiet = 0) %>% 
-  add_fitted_draws(mod_fishcont, n = 100) %>% 
-  ggplot(aes(x = logCoastLength, y = occurrence)) +
-  geom_line(aes(y = .value, group = paste(.draw)), alpha = 0.1,
-            colour = 'darkblue') +
-  geom_point(data = pc_data, size = 4, shape = '|',
-             colour = 'grey60', alpha = 0.7) +
-  geom_line(data = zero_pred, aes(x = logCoastLength, y = mean_value),
-            colour = 'darkblue',
-            size = 1.5) +
-  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank()) +
-  labs(y = 'Occurrence') +
-  publication_theme()
-  
-
-fitlines_nofish
-
-# fitlines plot for all fishing pressures 
-fitlines_all <- 
-  plot_grid(fitlines_nofish, fitlines_plot, ncol = 1,
-            align = 'v', scale = 1)
-
-fitlines_all
-
-#posterior distrbution plot --------------
-post_values_nofish <- 
+# posterior of continuous variables --------------
+# need to plot the density plots separately because facet_wrap fucks the alignment later
+post_values <- 
   posterior_samples(mod_fishcont, '^b') %>% 
-  dplyr::select('b_Intercept')
-
-basic_dens <- 
-  ggplot(post_values_nofish, aes(x = b_Intercept)) +
-  geom_density(colour = 'grey90') +
-  expand_limits(x = c(-23, 23),
-                y = c(0, 0.4)) +
-  geom_vline(xintercept = 0, linetype = 'dashed', colour = 'grey60',
-             size = 0.7) +
-  theme(axis.text = element_blank(),
-        axis.line.y = element_line(colour = 'grey60'),
-        axis.line.x = element_line(colour = 'grey60'),
-        panel.grid = element_blank(),
-        panel.background = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title.y = element_text(size = 13, colour = 'grey20', angle = 0, hjust = 0,
-                                    vjust = 0.5)) +
-  labs(y = 'No Fishing')
-  
-dens_df <- ggplot_build(basic_dens)$data[[1]]
-
-nofish_plot <- 
-  basic_dens +
-  geom_area(data = dens_df %>% 
-              dplyr::filter(x < 0),
-            aes(x = x, y = y),
-            fill = 'darkblue')
-
-nofish_plot
+  gather(key = intercept) %>%
+  dplyr::filter(intercept != 'b_Intercept')
 
 
+post_coast <- 
+  post_values %>% 
+  dplyr::filter(intercept == 'b_logCoastLength') %>% 
+  ggplot(aes(x = value)) +
+  geom_density(colour = 'grey50', alpha = 0.9, fill = '#4d4d4d') +
+  expand_limits(x = c(-3, 2)) + 
+  scale_y_continuous(limits = c(-0.2, 2.5),
+                     breaks = seq(0, 2.5, 0.5)) +
+  labs(x = '',
+       y = '') +
+  geom_vline(xintercept = 0, linetype = 'solid',
+             colour = 'grey50', size = 1) +
+  publication_theme() +
+  labs(y = 'log Coastline length') +
+  theme(plot.margin = unit(c(0.1, 0.5, -1, 0.5), 'cm'),
+        axis.title.y = element_text(size = 12, colour = 'grey20'),
+        axis.text.x = element_blank())
 
-all_density <- 
-  plot_grid(nofish_plot, low, mod, high, ncol = 1, align = 'v', scale = 1)
+post_coast
 
-all_density2 <- ggdraw(add_sub(all_density, 'Posterior Prediction', hjust = 0.1))
-all_density2
+post_fish <- 
+  post_values %>% 
+  dplyr::filter(intercept == 'b_logProteinDiet') %>% 
+  ggplot(aes(x = value)) +
+  geom_density(colour = 'grey50', alpha = 0.9, fill = '#bd0026') +
+  expand_limits(x = c(-3, 2)) + 
+  labs(x = '',
+       y = '') +
+  scale_y_continuous(limits = c(0, 1),
+                     breaks = seq(0, 1, 0.2)) +
+  geom_vline(xintercept = 0, linetype = 'solid',
+             colour = 'grey50', size = 1) +
+  publication_theme() +
+  labs(y = 'log Fishing pressure',
+       x = 'Coefficient estimate') +
+  theme(plot.margin = unit(c(0, 0.5, 0.1, 0.5), 'cm'),
+        axis.title.y = element_text(size = 12, colour = 'grey20'))
 
+post_plots <- 
+  grid.arrange(post_coast, post_fish, ncol = 1)
 
-# now combine all density plots and fitlines plots
-# this has fishing pressures AND zero fishing
-all_plots <- 
-  plot_grid(fitlines_all, all_density2, ncol = 2)
+ggsave('../../../Figures/EcoCarryCapacity/DynamicGeographyContCoef_191130.pdf',
+       post_plots, height = 20, width = 25, units = c('cm'))
 
-all_plots
-
-ggsave('../../../Figures/EcoCarryCapacity/DynamicGeographyZeroFish_191017.pdf', 
-       all_plots,
-       height = 20, width = 30, units = c('cm'))
-
-# without zero fishing
-allfish_density_unlabelled <- 
-  plot_grid(low, mod, high, ncol = 1, align = 'v', scale = 1)
-
-
-allfish_density <- 
-  ggdraw(add_sub(allfish_density_unlabelled, 'Posterior Prediction', hjust = 0.1))
-
-allfish_all_plots <- 
-  plot_grid(fitlines_plot, allfish_density, ncol = 2,
-            scale = 1)
-
-allfish_all_plots
-
-ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191017.pdf',
-       allfish_all_plots, height = 20, width = 40, units = c('cm'))
 
 # -------------------------------------------------------------------------
 # Make fitlines plot and predict each of the curves using cont model ------
@@ -371,7 +323,8 @@ quarts <-
     
     qs_df <- 
       pc_data %>% 
-      data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+      #data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+      data_grid(logCoastLength = seq(from = 2, to = 12.5, by = 0.1)) %>% 
       mutate(logProteinDiet = paste(x),
              logProteinDiet = as.numeric(logProteinDiet)) %>% 
       add_fitted_draws(mod_fishcont, n = 110)
@@ -396,7 +349,7 @@ preds_fitlines_protein <-
   #                    colour = factor(logProteinDiet))) +
   # change it so there are no posterior draws for zero and max
   pred_qsP %>% 
-  dplyr::filter(!logProteinDiet %in% c(QminP, QmaxP)) %>% 
+  #dplyr::filter(!logProteinDiet %in% c(QminP, QmaxP)) %>% 
   ggplot(aes(x = logCoastLength, y = occurrence,
              colour = factor(logProteinDiet))) +
   geom_line(aes(y = .value, group = paste(logProteinDiet, .draw)), 
@@ -409,10 +362,11 @@ preds_fitlines_protein <-
               method = 'glm', 
               method.args = list(family = 'quasibinomial'),
               size = 1) +
-  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
-  theme(legend.key = element_rect(fill = NA),
-        legend.title = element_text(size = 14, colour = 'grey20'),
-        legend.text = element_text(size = 13, colour = 'grey20')) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 0.05, 1)) +
+  theme(legend.position = 'none') +
+        #legend.key = element_rect(fill = NA),
+        #legend.title = element_text(size = 14, colour = 'grey20'),
+        #legend.text = element_text(size = 13, colour = 'grey20')) +
   guides(colour = guide_legend(override.aes = list(size = 2,
                                                    alpha = 0.8))) +
   scale_colour_manual(values = c('darkblue', '#fd8d3c',
@@ -426,14 +380,97 @@ preds_fitlines_protein <-
                                  'Maximum')) +
   publication_theme() +
   labs(y = 'Occupancy',
-       x = 'log Coastline length',
-       title = 'Fishing pressure = protein consumption')
+       x = 'log Coastline length') +
+  geom_hline(yintercept = 0.05, colour = 'grey20', linetype = 'solid',
+             size = 1.5)
   
-
 preds_fitlines_protein
 
-ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191114.pdf',
-       preds_fitlines_protein, height = 20, width = 25, units = c('cm'))
+ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191130.png',
+       preds_fitlines_protein, height = 20, width = 30, units = c('cm'))
+
+
+# predict coastline size to have 0.05 occupancy at different fishing levels -------------------
+
+head(pred_qsP)
+
+pred_5 <- 
+  pred_qsP %>% 
+  mutate(.value = round(.value, 2)) %>% 
+  dplyr::filter(.value == 0.05) %>% 
+  mutate(fishBin = case_when(logProteinDiet == QminP ~ 'Zero',
+                             logProteinDiet == Q1P ~ 'Low',
+                             logProteinDiet == Q2P ~ 'Moderate',
+                             logProteinDiet == Q3P ~ 'High',
+                             logProteinDiet == QmaxP ~ 'Maximum'),  
+         fishBin = ifelse(is.na(fishBin), 'High', fishBin),
+         fishBin = factor(fishBin, levels = c('Zero', 'Low',
+                                                 'Moderate', 'High',
+                                                 'Maximum')))
+
+
+pred_5_med <- 
+  pred_5 %>% 
+  group_by(fishBin) %>% 
+  summarise(med_f = median(logCoastLength),
+            sd_f = sd(logCoastLength),
+            n = n(),
+            se_f = sd_f/sqrt(n),
+            ci_95 = se_f*1.96)
+
+plot_5 <- 
+  ggplot(pred_5, aes(x = fishBin, y = logCoastLength,
+             fill = fishBin, colour = fishBin)) +
+  geom_point(size = 2, alpha = 0.4, 
+             position = position_jitter(width = 0.15)) +
+  geom_violin(trim = FALSE, alpha = 0.6, colour = NA) + 
+  geom_point(data = pred_5_med, aes(x = fishBin, y = med_f),
+             size = 20, shape = '_', colour = 'grey20') +
+  scale_fill_manual(values = c('darkblue', '#fd8d3c',
+                               '#fc4e2a', '#e31a1c',
+                               '#800026')) +
+  scale_colour_manual(values = c('darkblue', '#fd8d3c',
+                                 '#fc4e2a', '#e31a1c',
+                                 '#800026')) +
+  publication_theme() +
+  scale_y_continuous(limits = c(1, 11),
+                     breaks = seq(1.5, 9.5, 2)) +
+  theme(legend.position = 'none',
+        plot.margin = unit(c(0.1, 0.5, 0.1, 0.5), 'cm'),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 11)) +
+  labs(y = 'log Coastline length',
+       x = 'log Fishing pressure')
+
+plot_5
+
+post_5 <- 
+  plot_grid(post_plots, plot_5, ncol = 1,
+            scale = 1, axis = 'lr')
+
+post_5
+
+ggsave('../../../Figures/EcoCarryCapacity/DensOcc5_191201.png',
+       post_5, height = 20, width = 12, units = c('cm'))
+
+fit_post_5 <- 
+  plot_grid(preds_fitlines_protein, post_5, ncol = 2,
+            rel_widths = c(2, 1), rel_heights = c(1, 1.3),
+            axis = 'b')
+
+fit_post_5
+
+ggsave('../../../Figures/EcoCarryCapacity/DgPost5_191201.png',
+       fit_post_5, height = 20, width = 30, units = c('cm'))
+
+
+
+
+
+
+
+
+
 
 # do the same for gear-specific landings ---------------------------------------
 # make a model with gear-specific landings
@@ -517,126 +554,27 @@ preds_fitlines_gear <-
        title = 'Gear-restricted landings')
 
 preds_fitlines_gear
-
-
-# -------------------------------------------------------------------------
-# Re-write continuous model with intercept term and STAN ------------------
-# -------------------------------------------------------------------------
-library(bayesplot)
-
-stan_cont <- "
-  data {
-    int N;
-    vector[N] logCoastLength;
-    //int<lower = 0, upper = 1> occurrence[N];
-  }
-  
-  parameters {
-    real alpha;
-    real b_coast;
-    
-  }
-  
-  model {
-    
-    occurrence ~ (1 / (1 + exp(alpha - b_coast*logCoastLength)));
-    //occurrence ~ bernoulli(inv_logit(alpha + b_coast*logCoastLength));
-   
-  }
-  
-"
-
-stan_data <- 
-  list(N = nrow(pc_data),
-       logCoastLength = pc_data$logCoastLength,
-       occurrence = pc_data$occurrence)
-       #logCoastPop = pc_data$logCoastPop)
-
-
-mod_stan_cont <- stan(model_code = stan_cont,
-                      data = stan_data,
-                      chains = 2,
-                      iter = 2000,
-                      pars = c('alpha', 'b_coast', 'c'))
-
-y = 1 / (1 + exp[a - bx] ) + c
-
-stan_cont <- "
-  data {
-    int N;
-    vector[N] logCoastLength;
-    int<lower = 0, upper = 1> occurrence;
-  }
-  
-  parameters {
-    real alpha;
-    real b_coast;
-    real c;
-  }
-  
-  model {
-    occurrence ~ bernoulli_logit(alpha + b_coast * logCoastLength) + c;
-  }
-  
-"
-
-
-
-
-
-stan_data <- 
-  list(N = nrow(pc_data),
-       logCoastLength = pc_data$logCoastLength,
-       logProteinDiet = pc_data$logProteinDiet,
-       occurrence = pc_data$occurrence)
-
-summary(mod_stan_cont)
-posterior <- as.matrix(mod_stan_cont)
-bayesplot::mcmc_areas(posterior,
-                      pars = c('alpha', 'b_coast', 'sigma'),
-                      prob = 0.95)
-
-
-
-
-
-
-
-
-
-
-
-  y = 1 / (1 + exp[a - bx] ) + c
-
-
-mod <- nls(occurrence ~ 1/(1 + exp(a - b*logCoastLength)),
-           data = pc_data, a = 1, b = 1)
-
-mod <- nls(occurrence ~ 1/(1 + exp(a - b*logCoastLength)),
-           data = pc_data, start = list(a = 1, b = 1))
-
-
-
 # -------------------------------------------------------------------------
 # NLS model with extra intercept value ------------------------------------
 # -------------------------------------------------------------------------
 
 set.seed(123)
-mod <- nls(occurrence ~ (1/(1 + exp(a - b_c*logCoastLength) + b_f*logProteinDiet)) + c,
+mod <- 
+  nls(occurrence ~ (1/(1 + exp((a - b_c*logCoastLength) + (b_f*logProteinDiet)))) + c,
            data = pc_data,
            start = list(a = 0.1, b_c = 0.2, b_f = 0.1, c = 0.1))
 
 summary(mod)
 
 # nasty baseplot stuff but whatever ---------------------
-x <- seq(min(0), max(pc_data$logCoastLength), length = 100)
+x <- seq(min(-3), max(pc_data$logCoastLength), length = 100)
 y0 <- predict(mod, list(logCoastLength = x, logProteinDiet = 0))
 y1 <- predict(mod, list(logCoastLength = x, logProteinDiet = 0.5))
 y2 <- predict(mod, list(logCoastLength = x, logProteinDiet = 1))
 y3 <- predict(mod, list(logCoastLength = x, logProteinDiet = 1.5))
 y4 <- predict(mod, list(logCoastLength = x, logProteinDiet = 2.5))
 
-plot(occurrence ~ logCoastLength, pc_data, xlim = c(2, 12),
+plot(occurrence ~ logCoastLength, pc_data, xlim = c(-3, 12),
      col = 'grey60', pch = '|')
 points(x, y0, type = 'l', col = 'darkblue', lwd = 2)
 points(x, y1, type = 'l', col = '#fd8d3c', lwd = 2)
@@ -659,8 +597,9 @@ coefs <-
   geom_vline(xintercept = 0,
              linetype = 2,
              colour = 'grey40') +
-  geom_errorbarh(aes(xmin = Estimate - Std..Error, xmax = Estimate + Std..Error),
-                 height = 0,
+  ggplot2::geom_errorbarh(aes(xmin = Estimate - Std..Error, 
+                              xmax = Estimate + Std..Error,
+                     height = 0), 
                  colour = 'darkslategray') +
   labs(y = '',
        title = 'NLS Coefficients with mean estimate ± SE') +
@@ -670,4 +609,36 @@ coefs
 
 ggsave('../../../Figures/EcoCarryCapacity/NLS_coefplot_191119.pdf', coefs,
        width = 28, height = 20, units = c('cm'))
+
+# -------------------------------------------------------------------------
+# Random effect of fishing ------------------------------------------------
+# -------------------------------------------------------------------------
+
+mod_int <- 
+  brm(occurrence ~ logCoastLength * fishBin3,
+      data = pc_data,
+      family = 'bernoulli',
+      seed = 123,
+      chains = 4)
+
+summary(mod_int)
+plot(mod_int)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
