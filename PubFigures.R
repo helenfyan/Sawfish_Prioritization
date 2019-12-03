@@ -12,7 +12,7 @@ presentation_theme <- function(axis_text_size = 13, axis_y_ticks = element_line(
         axis.text.x = element_text(colour = 'black'),
         axis.ticks.y = axis_y_ticks,
         axis.title = element_text(size = 14))
-}
+} 
 
 # this makes the background dark navy blue for presentations 
 #panel.background = element_rect(fill = '#080818', colour = '#080818')
@@ -572,9 +572,15 @@ ggsave('../../Figures/UnlabelledPDP_190815.pdf', all01,
 # ------------------------------------------------------------------
 # Sawfish Search Figure --------------------------------------------
 # ------------------------------------------------------------------
-searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_190312.csv')
+library(raster)
+library(rgdal)
+library(rasterVis)
+library(remotes)
+library(sf)
+
+searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_191202.csv')
 searchCoord <- 
-  read_csv('../../../Datasets/SawfishSearchCountriesComplete_190414.csv')
+  read_csv('../../../Datasets/SawfishSearchCountriesComplete_191202.csv')
 
 # want long style where twe have a study type in the country - size of the dot
 # corresponding to the number of studies done in the area
@@ -583,16 +589,17 @@ searchClean <-
   searchRaw %>% 
   # remove species from further analyses
   # also remove reference IDs, citation, notes, and year
-  select(-species1:-species5, -citation, -notes, -year) %>% 
+  dplyr::select(-species1:-species5, -citation, -notes, -year) %>% 
   # gather the different survey types
   gather(key = key, value = method, method1:method4) %>% 
   # gather the different countries now
   gather(key = key, value = country, country1:country25) %>% 
-  select(-key) %>% 
+  mutate(country = dplyr::recode(country, 'coasta rica' = 'costa rica')) %>% 
+  dplyr::select(-key) %>% 
   drop_na() %>% 
   mutate(method = gsub(' ', '_', method)) %>% 
   # filter out eDNA and direct survey
-  dplyr::filter(!method %in% c('direct_survey', 'eDNA')) %>% 
+  #dplyr::filter(!method %in% c('direct_survey', 'eDNA')) %>% 
   mutate(method = recode(method,
                          'fisheries' = 'Bather Protection Nets & Fisheries',
                          'bather_net' = 'Bather Protection Nets & Fisheries',
@@ -600,7 +607,7 @@ searchClean <-
                          'museum' = 'Museum Records',
                          'media' = 'Media Reports',
                          'historical_data' = 'Media Reports',
-                         #'direct_survey' = 'Literature & Expert Advice',
+                         'direct_survey' = 'Literature & Expert Advice',
                          'encounter_data' = 'Literature & Expert Advice',
                          'literature' = 'Literature & Expert Advice',
                          'expert' = 'Literature & Expert Advice',
@@ -620,26 +627,15 @@ unique(searchClean$method)
 #  distinct(country, .keep_all = TRUE)
 
 #write.csv(searchCountries, '../SawfishSearchCountriesEmpty_190414.csv')
-library(rnaturalearth)
-library(rnaturalearthdata)
-library(sf)
 
-world <- 
-  ne_countries(scale = 'medium',
-               type = 'countries',
-               returnclass = 'sf') %>% 
-  dplyr::filter(continent != 'Antarctica')
+map_shp <- 
+  st_read('../../../GIS/Maps/world shapefile/world_country_admin_boundary_shapefile_with_fips_codes.shp')
 
 methodsMap <- 
-  ggplot(data = world) +
-  geom_sf(fill = 'grey75', color = 'grey80', size = 0.2) +
-  #geom_sf(fill = 'grey25', color = 'grey30', size = 0.2) +
-  geom_point(data = searchClean, 
-             aes(x = long, y = lat,
-                 colour = method,
-                 size = total),
+  ggplot() +
+  geom_sf(data = map_shp, colour = 'grey80', fill = 'grey70', size = 0.2) +
+  geom_point(data = searchClean, aes(x = long, y = lat, colour = method, size = total),
              alpha = 0.5) +
-  scale_size(range = c(4, 14)) +
   theme(panel.background = element_blank(),
         panel.border = element_blank(),
         axis.title = element_blank(),
@@ -651,10 +647,14 @@ methodsMap <-
         legend.title = element_text(size = 13)) +
   guides(size = FALSE,
          colour = guide_legend(override.aes = list(size = 6))) +
-  labs(colour = 'Method')
+  labs(colour = 'Method') +
+  scale_size(range = c(6, 18))
+  
 
-ggsave('../../../Figures/Publication/Maps/MapMethods_190416.pdf', methodsMap, 
-       height = 19.05, width = 30.58, units = c('cm'))
+methodsMap
+
+ggsave('../../../Figures/Publication/Maps/MapMethods_191202.png', methodsMap, 
+       height = 20, width = 30, units = c('cm'))
 
 
 # ------------------------------------------------------------------
