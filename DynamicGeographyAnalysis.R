@@ -263,7 +263,7 @@ post_coast <-
   post_values %>% 
   dplyr::filter(intercept == 'b_logCoastLength') %>% 
   ggplot(aes(x = value)) +
-  geom_density(colour = 'grey50', alpha = 0.9, fill = '#4d4d4d') +
+  geom_density(colour = 'grey50', alpha = 0.9, fill = '#1d91c0') +
   expand_limits(x = c(-3, 2)) + 
   scale_y_continuous(limits = c(-0.2, 2.5),
                      breaks = seq(0, 2.5, 0.5)) +
@@ -283,7 +283,7 @@ post_fish <-
   post_values %>% 
   dplyr::filter(intercept == 'b_logProteinDiet') %>% 
   ggplot(aes(x = value)) +
-  geom_density(colour = 'grey50', alpha = 0.9, fill = '#bd0026') +
+  geom_density(colour = 'grey50', alpha = 0.9, fill = '#a50f15') +
   expand_limits(x = c(-3, 2)) + 
   labs(x = '',
        y = '') +
@@ -362,16 +362,16 @@ preds_fitlines_protein <-
               method = 'glm', 
               method.args = list(family = 'quasibinomial'),
               size = 1) +
-  scale_y_continuous(limits = c(0, 1), breaks = c(0, 0.05, 1)) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
   theme(legend.position = 'none') +
         #legend.key = element_rect(fill = NA),
         #legend.title = element_text(size = 14, colour = 'grey20'),
         #legend.text = element_text(size = 13, colour = 'grey20')) +
   guides(colour = guide_legend(override.aes = list(size = 2,
                                                    alpha = 0.8))) +
-  scale_colour_manual(values = c('darkblue', '#fd8d3c',
-                                 '#fc4e2a', '#e31a1c',
-                                 '#800026'),
+  scale_colour_manual(values = c('#fc9272', '#fb6a4a',
+                                 '#ef3b2c', '#a50f15',
+                                 '#67000d'),
                       name = 'Fishing\npressure',
                       labels = c('Zero',
                                  'Low',
@@ -382,7 +382,7 @@ preds_fitlines_protein <-
   labs(y = 'Occupancy',
        x = 'log Coastline length') +
   geom_hline(yintercept = 0.05, colour = 'grey20', linetype = 'solid',
-             size = 1.5)
+             size = 1.2)
   
 preds_fitlines_protein
 
@@ -426,12 +426,12 @@ plot_5 <-
   geom_violin(trim = FALSE, alpha = 0.6, colour = NA) + 
   geom_point(data = pred_5_med, aes(x = fishBin, y = med_f),
              size = 20, shape = '_', colour = 'grey20') +
-  scale_fill_manual(values = c('darkblue', '#fd8d3c',
-                               '#fc4e2a', '#e31a1c',
-                               '#800026')) +
-  scale_colour_manual(values = c('darkblue', '#fd8d3c',
-                                 '#fc4e2a', '#e31a1c',
-                                 '#800026')) +
+  scale_fill_manual(values = c('#fc9272', '#fb6a4a',
+                               '#ef3b2c', '#a50f15',
+                               '#67000d')) +
+  scale_colour_manual(values = c('#fc9272', '#fb6a4a',
+                                 '#ef3b2c', '#a50f15',
+                                 '#67000d')) +
   publication_theme() +
   scale_y_continuous(limits = c(1, 11),
                      breaks = seq(1.5, 9.5, 2)) +
@@ -460,7 +460,7 @@ fit_post_5 <-
 
 fit_post_5
 
-ggsave('../../../Figures/EcoCarryCapacity/DgPost5_191201.png',
+ggsave('../../../Figures/EcoCarryCapacity/DgPost5_191203.pdf',
        fit_post_5, height = 20, width = 30, units = c('cm'))
 
 
