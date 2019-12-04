@@ -2,8 +2,6 @@
 
 library(tidyverse)
 
-setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/')
-
 # make presentation theme for all figures ------------------------
 presentation_theme <- function(axis_text_size = 13, axis_y_ticks = element_line()) {
   theme(panel.background = element_blank(),
@@ -135,9 +133,7 @@ ggsave('../Figures/Publication/CorHeatMap_190213.pdf', corfig,
 #  Partial dependence plots ----------------------------------------
 #  -----------------------------------------------------------------
 
-setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/GBM out')
-
-library(tidyverse)
+setwd('../../../datasets/GBM out')
 
 figs <- list.files(pattern = '*_190201.csv')
 dfs <- lapply(figs, read.csv)
@@ -236,6 +232,17 @@ fishscales <- list(
                                      breaks = seq(0.36, 0.4, 0.04))
 )
 
+fishscales <- list(
+  'logProteinDiet' = scale_y_continuous(limits = c(0.15, 0.7),
+                                        breaks = seq(0.1, 0.7, 0.1)),
+  'logtotalGearTonnes' = scale_y_continuous(limits = c(0.2, 0.6), 
+                                            breaks = seq(0.2, 0.6, 0.1)),
+  'logChondCatch' = scale_y_continuous(limits = c(0.2, 0.6),
+                                       breaks = seq(0.36, 0.42, 0.06)),
+  'logCoastPop' = scale_y_continuous(limits = c(0.2, 0.6),
+                                     breaks = seq(0.36, 0.4, 0.04))
+)
+
 fishrug <- c(0.15, 0.2, 0.34, 0.35)
 
 fishtitle <- 
@@ -255,15 +262,14 @@ fishtitle <-
 
 fish <- 
   ggplot(finalfish_f, aes(x = stdvalue, y = totmean)) +
-  geom_ribbon(aes(ymin = totmin, ymax = totmax),
-              alpha = 0.6, fill = 'dodgerblue') +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#d7301f') +
   geom_line(size = 1) +
-  #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y')
+  #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y') + 
   facet_grid_sc(rows = vars(variable), space = 'free_y', 
                 scales = list(y = fishscales)) +
   pdp_theme() +
-  labs(x = '', y = 'Marginal Effect on Sawfish Occurrence') +
-  theme(plot.margin = unit(c(0.1, 0, -0.5, 1), 'cm'))
+  labs(y = '', x = '') +
+  theme(plot.margin = unit(c(0.1, 0.1, -0.5, -0.05), 'cm')) 
   #geom_text(data = fishtitle, mapping = aes(x = x, y = y, label = label), size = 5)
 
 print(fish)
@@ -300,7 +306,7 @@ manscales <-
                                breaks = seq(0.36, 0.42, 0.06)),
     'WGI' = scale_y_continuous(limits = c(0.32, 0.5), 
                                breaks = seq(0.35, 0.45, 0.05)),
-    'logGDP' = scale_y_continuous(limits = c(0.3, 0.45), 
+    'logGDP' = scale_y_continuous(limits = c(0.3, 0.48), 
                                   breaks = seq(0.32, 0.4, 0.08))
   )
 
@@ -316,8 +322,7 @@ mantitle <-
 
 man <- 
   ggplot(finalmanage_f, aes(x = stdvalue, y = totmean)) +
-  geom_ribbon(aes(ymin = totmin, ymax = totmax),
-              alpha = 0.6, fill = 'deeppink3') +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#984ea3') +
   geom_line(size = 1) +
   facet_grid_sc(rows = vars(variable), space = 'free_y', scales = list(y = manscales)) +
   pdp_theme() +
@@ -350,8 +355,8 @@ finaleco_f <-
                                                 'SstMean')))
 
 ecoscales <- list(
-  'logCoastLength' = scale_y_continuous(limits = c(0.1, 0.8),
-                                        breaks = seq(0.1, 0.8, 0.1)),
+  'logCoastLength' = scale_y_continuous(limits = c(0.05, 0.9),
+                                        breaks = seq(0.1, 0.9, 0.2)),
   'logMang' = scale_y_continuous(limits = c(0.3, 0.6),
                                  breaks = seq(0.3, 0.6, 0.1)),
   'logEstDis' = scale_y_continuous(limits = c(0.3, 0.6),
@@ -375,26 +380,26 @@ ecotitle <-
 
 ecology <- 
   ggplot(finaleco_f, aes(x = stdvalue, y = totmean)) +
-  geom_ribbon(aes(ymin = totmin, ymax = totmax),
-              alpha = 0.6, fill = 'darkgreen') +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#1d91c0') +
   geom_line(size = 1) +
   #facet_grid(variable ~ ., space = 'free_y', scales = 'free_y') +
   facet_grid_sc(rows = vars(variable), space = 'free_y', 
                 scales = list(y = ecoscales)) +
   pdp_theme() +
-  labs(y = '', x = '') +
-  theme(plot.margin = unit(c(0.1, 0.1, -0.5, -0.05), 'cm'))
+  labs(x = '', y = 'Marginal effect on sawfish occurrence') +
+  theme(plot.margin = unit(c(0.1, 0, -0.5, 1), 'cm'))
+
   #geom_text(data = ecotitle, mapping = aes(x = x, y = y, label = label), size = 5)
 
 print(ecology)
 
-allstd <- grid.arrange(fish, man, ecology, ncol = 3, 
-             bottom = grid::textGrob('Standardized Value of Explanatory Variable', 
+allstd <- grid.arrange(ecology, fish, man, ncol = 3, 
+             bottom = grid::textGrob('Standardized value of explanatory variable', 
                                gp = gpar(fontsize = 18, col = 'grey20'), 
                                vjust = 1e-5, hjust = 0.35))
 
-ggsave('../../Figures/Publication/UnlabelledPDPstd_190503.pdf', allstd,
-       height = 19.05, width = 30.59, units = c('cm'))
+ggsave('../../Figures/Publication/UnlabelledPDPstd_191203.pdf', allstd,
+       height = 20, width = 30, units = c('cm'))
 
 # write a csv file containing all of the pdp values 
 
