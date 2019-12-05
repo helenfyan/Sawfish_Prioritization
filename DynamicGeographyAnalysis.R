@@ -300,8 +300,8 @@ post_fish <-
 post_plots <- 
   grid.arrange(post_coast, post_fish, ncol = 1)
 
-ggsave('../../../Figures/EcoCarryCapacity/DynamicGeographyContCoef_191130.pdf',
-       post_plots, height = 20, width = 25, units = c('cm'))
+#ggsave('../../../Figures/EcoCarryCapacity/DynamicGeographyContCoef_191130.pdf',
+#       post_plots, height = 20, width = 25, units = c('cm'))
 
 
 # -------------------------------------------------------------------------
@@ -361,7 +361,7 @@ preds_fitlines_protein <-
               se = FALSE, fullrange = TRUE,
               method = 'glm', 
               method.args = list(family = 'quasibinomial'),
-              size = 1) +
+              size = 1.5) +
   scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
   theme(legend.position = 'none') +
         #legend.key = element_rect(fill = NA),
@@ -386,8 +386,8 @@ preds_fitlines_protein <-
   
 preds_fitlines_protein
 
-ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191130.png',
-       preds_fitlines_protein, height = 20, width = 30, units = c('cm'))
+#ggsave('../../../Figures/EcoCarryCapacity/DynamicGeography_191130.png',
+#       preds_fitlines_protein, height = 20, width = 30, units = c('cm'))
 
 
 # predict coastline size to have 0.05 occupancy at different fishing levels -------------------
@@ -450,8 +450,8 @@ post_5 <-
 
 post_5
 
-ggsave('../../../Figures/EcoCarryCapacity/DensOcc5_191201.png',
-       post_5, height = 20, width = 12, units = c('cm'))
+#ggsave('../../../Figures/EcoCarryCapacity/DensOcc5_191201.png',
+#       post_5, height = 20, width = 12, units = c('cm'))
 
 fit_post_5 <- 
   plot_grid(preds_fitlines_protein, post_5, ncol = 2,
