@@ -605,6 +605,8 @@ searchClean <-
   mutate(method = gsub(' ', '_', method)) %>% 
   # filter out eDNA and direct survey
   #dplyr::filter(!method %in% c('direct_survey', 'eDNA')) %>% 
+  # remove eDNA
+  dplyr::filter(method != 'eDNA') %>% 
   mutate(method = recode(method,
                          'fisheries' = 'Bather Protection Nets & Fisheries',
                          'bather_net' = 'Bather Protection Nets & Fisheries',
@@ -638,28 +640,29 @@ map_shp <-
 
 methodsMap <- 
   ggplot() +
-  geom_sf(data = map_shp, colour = 'grey80', fill = 'grey70', size = 0.2) +
+  geom_sf(data = map_shp, colour = 'grey90', fill = 'grey80', size = 0.2) +
   geom_point(data = searchClean, aes(x = long, y = lat, colour = method, size = total),
              alpha = 0.5) +
   theme(panel.background = element_blank(),
         panel.border = element_blank(),
         axis.title = element_blank(),
         axis.text = element_blank(),
+        axis.ticks = element_blank(),
         legend.key = element_blank(),
         legend.background = element_rect(fill = 'white'),
         legend.position = c(0.17, 0.25),
         legend.text = element_text(size = 11),
         legend.title = element_text(size = 13)) +
   guides(size = FALSE,
-         colour = guide_legend(override.aes = list(size = 6))) +
+         colour = guide_legend(override.aes = list(size = 6,
+                                                   alpha = 0.8))) +
   labs(colour = 'Method') +
   scale_size(range = c(6, 18))
-  
 
 methodsMap
 
-ggsave('../../../Figures/Publication/Maps/MapMethods_191202.png', methodsMap, 
-       height = 20, width = 30, units = c('cm'))
+ggsave('../../../Figures/Publication/Maps/MapMethods_191208.png', methodsMap, 
+       height = 20, width = 30, units = c('cm'), dpi = 600)
 
 # ------------------------------------------------------------------
 # Density plots ----------------------------------------------------
