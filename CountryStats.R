@@ -4,8 +4,6 @@ library(tidyverse)
 library(countrycode)
 library(broom)
 
-setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/')
-
 # ---------------------------------------------------------------------------------------------------
 # Number of individuals lost from a single country etc. ---------------------------------------------
 # ---------------------------------------------------------------------------------------------------
@@ -33,6 +31,34 @@ allspp <-
 head(allspp)
 lapply(allspp, function(x) sum(is.na(x)))
 
+# clean dataframe for danielle to analyze ----------------------
+# make a column for predictions 
+pred_raw <- read_csv('../../../Datasets/GBMPredictedMeans_190122.csv') %>% 
+  dplyr::select(-X1)
+
+pred <- 
+  pred_raw %>% 
+  mutate(action = case_when(ISO3 == 'YEM' ~ 'middle',
+                            value > 0.75 ~ 'protect',
+                            value <= 0.25 ~ 'extinct',
+                            TRUE ~ as.character('middle'))) %>% 
+  dplyr::filter(action != 'middle') %>% 
+  dplyr::select(-value)
+
+head(pred)
+
+area_calc <- 
+  allspp %>% 
+  dplyr::select(-refid, -nosppNow, -nosppHist) %>% 
+  dplyr::filter(ISO3 != 'LAO') %>% 
+  spread(species, presence) %>% 
+  left_join(., pred, by = c('ISO3' = 'ISO3'))
+
+
+head(area_calc)
+View(area_calc)
+
+write_csv(area_calc, '../../../Datasets/SawfishOccurrence_191209.csv')
 
 # historical distribution of sawfishes
 hist <- 
