@@ -237,9 +237,9 @@ fishscales <- list(
                                         breaks = seq(0.1, 0.7, 0.1)),
   'logtotalGearTonnes' = scale_y_continuous(limits = c(0.2, 0.6), 
                                             breaks = seq(0.2, 0.6, 0.1)),
-  'logChondCatch' = scale_y_continuous(limits = c(0.2, 0.6),
+  'logChondCatch' = scale_y_continuous(limits = c(0.3, 0.5),
                                        breaks = seq(0.36, 0.42, 0.06)),
-  'logCoastPop' = scale_y_continuous(limits = c(0.2, 0.6),
+  'logCoastPop' = scale_y_continuous(limits = c(0.3, 0.5),
                                      breaks = seq(0.36, 0.4, 0.04))
 )
 
