@@ -610,23 +610,180 @@ coefs
 ggsave('../../../Figures/EcoCarryCapacity/NLS_coefplot_191119.pdf', coefs,
        width = 28, height = 20, units = c('cm'))
 
-# -------------------------------------------------------------------------
-# Random effect of fishing ------------------------------------------------
-# -------------------------------------------------------------------------
+# ----------------------------------------------------------------------
+# TESTING MANGROVES ----------------------------------------------------
+# ----------------------------------------------------------------------
 
-mod_int <- 
-  brm(occurrence ~ logCoastLength * fishBin3,
+mod_Ma <- 
+  brm(occurrence ~ logCoastLength + logMangroveArea,
       data = pc_data,
       family = 'bernoulli',
-      seed = 123,
-      chains = 4)
+      seed = 123)
 
-summary(mod_int)
-plot(mod_int)
+plot(mod_Ma)
+
+# mangrove cover
+QsMang <- summary(pc_data$logMangroveArea)
+QminM <- QsMang[1]
+Q1M <- QsMang[2]
+Q2M <- QsMang[3]
+Q3M <- QsMang[5]
+QmaxM <- QsMang[6]
+
+quarts <- 
+  lapply(c(QminM, Q1M, Q2M, Q3M, QmaxM), function(x) {
+    
+    set.seed(123)
+    
+    qs_df <- 
+      pc_data %>% 
+      #data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+      data_grid(logCoastLength = seq(from = 2, to = 12.5, by = 0.1)) %>% 
+      mutate(logMangroveArea = paste(x),
+             logMangroveArea = as.numeric(logMangroveArea)) %>% 
+      add_fitted_draws(mod_Ma, n = 110)
+    
+    return(qs_df)
+    
+  })
+
+# bind all of them together
+pred_qsM <- 
+  rbind(quarts[[1]], quarts[[2]], quarts[[3]], quarts[[4]], quarts[[5]])
+
+# calculate means to draw mean line
+pred_meansM <- 
+  pred_qsM %>% 
+  group_by(logMangroveArea, logCoastLength) %>% 
+  summarise(mean_val = mean(.value))
+
+# plot this badboy
+preds_fitlines_man <- 
+  pred_qsM %>% 
+  ggplot(aes(x = logCoastLength, y = occurrence,
+             colour = factor(logMangroveArea))) +
+  geom_line(aes(y = .value, group = paste(logMangroveArea, .draw)), 
+            alpha = 0.15) +
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pred_meansM, aes(x = logCoastLength, y = mean_val,
+                                      colour = factor(logMangroveArea)),
+              se = FALSE, fullrange = TRUE,
+              method = 'glm', 
+              method.args = list(family = 'quasibinomial'),
+              size = 1.5) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme(legend.position = 'none') +
+  guides(colour = guide_legend(override.aes = list(size = 2,
+                                                   alpha = 0.8))) +
+  scale_colour_manual(values = c('#78c679', '#41ab5d',
+                                 '#238443', '#006837',
+                                 '#004529'),
+                      name = 'Mangrove Area',
+                      labels = c('Zero',
+                                 'Low',
+                                 'Moderate',
+                                 'High',
+                                 'Maximum')) +
+  publication_theme() +
+  labs(y = 'Occupancy',
+       x = 'log Coastline length')
+
+preds_fitlines_man
+
+ggsave('../../../Figures/EcoCarryCapacity/MangrovePost_191212.pdf', 
+       preds_fitlines_man,
+       width = 30, height = 20, units = c('cm'))
 
 
+# ----------------------------------------------------------------------
+# TESTING MANAGEMENT ---------------------------------------------------
+# ----------------------------------------------------------------------
 
+man <- read_csv('../../../Datasets/ProcessedCovariates_181128.csv')
 
+mod_gov <- 
+  brm(occurrence ~ logCoastLength + OHI,
+      data = man,
+      family = 'bernoulli',
+      seed = 123)
+
+plot(mod_gov)
+
+# mangrove cover
+QsGov <- summary(man$OHI)
+QminG <- QsGov[1]
+Q1G <- QsGov[2]
+Q2G <- QsGov[3]
+Q3G <- QsGov[5]
+QmaxG <- QsGov[6]
+
+quarts <- 
+  lapply(c(QminG, Q1G, Q2G, Q3G, QmaxG), function(x) {
+    
+    set.seed(123)
+    
+    qs_df <- 
+      man %>% 
+      #data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+      data_grid(logCoastLength = seq(from = 2, to = 12.5, by = 0.1)) %>% 
+      mutate(OHI = paste(x),
+             OHI = as.numeric(OHI)) %>% 
+      add_fitted_draws(mod_gov, n = 110)
+    
+    return(qs_df)
+    
+  })
+
+# bind all of them together
+pred_qsG <- 
+  rbind(quarts[[1]], quarts[[2]], quarts[[3]], quarts[[4]], quarts[[5]])
+
+head(pred_qsG)
+
+# calculate means to draw mean line
+pred_meansG <- 
+  pred_qsG %>% 
+  group_by(OHI, logCoastLength) %>% 
+  summarise(mean_val = mean(.value))
+
+# plot this badboy
+preds_fitlines_gov <- 
+  pred_qsG %>% 
+  ggplot(aes(x = logCoastLength, y = occurrence,
+             colour = factor(OHI))) +
+  geom_line(aes(y = .value, group = paste(OHI, .draw)), 
+            alpha = 0.15) +
+  geom_point(data = man, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pred_meansG, aes(x = logCoastLength, y = mean_val,
+                                      colour = factor(OHI)),
+              se = FALSE, fullrange = TRUE,
+              method = 'glm', 
+              method.args = list(family = 'quasibinomial'),
+              size = 1.5) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme(legend.position = 'none') +
+  guides(colour = guide_legend(override.aes = list(size = 2,
+                                                 alpha = 0.8))) +
+  scale_colour_manual(values = c('#49006a', '#7a0177',
+                                 '#ae017e', '#dd3497',
+                                 '#f768a1'),
+                      name = 'Ocean Health Index',
+                      labels = c('Zero',
+                                 'Low',
+                                 'Moderate',
+                                 'High',
+                                 'Maximum')) +
+  publication_theme() +
+  labs(y = 'Occupancy',
+       x = 'log Coastline length')
+
+preds_fitlines_gov
+
+ggsave('../../../Figures/EcoCarryCapacity/GovPost_191212.pdf', 
+       preds_fitlines_gov,
+       width = 30, height = 20, units = c('cm'))
 
 
 
