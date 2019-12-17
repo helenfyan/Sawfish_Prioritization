@@ -262,7 +262,8 @@ fishtitle <-
 
 fish <- 
   ggplot(finalfish_f, aes(x = stdvalue, y = totmean)) +
-  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#d7301f') +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#d7301f',
+              alpha = 0.6) +
   geom_line(size = 1) +
   #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y') + 
   facet_grid_sc(rows = vars(variable), space = 'free_y', 
@@ -322,7 +323,8 @@ mantitle <-
 
 man <- 
   ggplot(finalmanage_f, aes(x = stdvalue, y = totmean)) +
-  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#984ea3') +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#984ea3',
+              alpha = 0.6) +
   geom_line(size = 1) +
   facet_grid_sc(rows = vars(variable), space = 'free_y', scales = list(y = manscales)) +
   pdp_theme() +
@@ -380,7 +382,8 @@ ecotitle <-
 
 ecology <- 
   ggplot(finaleco_f, aes(x = stdvalue, y = totmean)) +
-  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#1d91c0') +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#1d91c0',
+              alpha = 0.6) +
   geom_line(size = 1) +
   #facet_grid(variable ~ ., space = 'free_y', scales = 'free_y') +
   facet_grid_sc(rows = vars(variable), space = 'free_y', 
