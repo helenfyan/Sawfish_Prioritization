@@ -329,7 +329,7 @@ man <-
   facet_grid_sc(rows = vars(variable), space = 'free_y', scales = list(y = manscales)) +
   pdp_theme() +
   labs(y = '', x = '') +
-  theme(plot.margin = unit(c(0.1, 0, -0.5, -0.05), 'cm'))
+  theme(plot.margin = unit(c(0.1, 0.1, -0.5, -0.05), 'cm'))
   #geom_text(data = mantitle, mapping = aes(x = x, y = y, label = label), size = 5)
 
 print(man)
