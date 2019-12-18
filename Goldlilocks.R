@@ -87,7 +87,7 @@ head(sort_df)
 # predict for 10% increase in mangrove area
 pred_man_df <- 
   preddata %>% 
-  mutate(logMang = logMang + (0.1*logMang))
+  mutate(logMang = logMang + (1*logMang))
   
 pred_man <- 
   predict(object = cvgbm,
@@ -133,31 +133,42 @@ all_fish <-
   mutate(country = countrycode(ISO3, 'iso3c', 'country.name')) %>% 
   mutate(country = dplyr::recode(country,
                                  'Myanmar (Burma)' = 'Myanmar')) %>% 
-  left_join(., sort_df, by = c('ISO3' = 'ISO3'))
+  left_join(., sort_df, by = c('ISO3' = 'ISO3')) %>% 
+  mutate(pred_bin = case_when(pred <= 0.2 ~ 'avlow',
+                              pred > 0.2 & pred <= 0.4 ~ 'blow',
+                              pred > 0.4 & pred <= 0.6 ~ 'cmod',
+                              pred > 0.6 & pred <= 0.8 ~ 'dhigh',
+                              pred > 0.8 & pred <= 1 ~ 'evhigh'))
   
 head(all_fish)
 
 fish_plot <- 
   ggplot(all_fish, aes(x = pred, 
                        y = reorder(country, -sort_id), 
-                       colour = level_pred)) +
+                       colour = pred_bin,
+                       alpha = level_pred)) +
+  geom_vline(xintercept = 0.5, colour = 'grey70') + 
   geom_line(data = all_fish, aes(x = pred, y = reorder(country, -sort_id), 
                                  group = country),
             colour = 'grey40') +
   geom_point(size = 5) +
-  geom_vline(xintercept = 0.5, colour = 'grey70') + 
   labs(y = '',
        x = 'Probability of extinction') +
-  scale_colour_manual(values = c('#800026', '#fd8d3c'),
-                      labels = c('Current risk', 'Zero fishing\nmortality'),
-                      name = stringr::str_wrap('Conservation potential for sawfishes',
-                                               width = 25)) +
-  scale_x_continuous(position = 'top',
+  scale_colour_manual(values = c('#231f20', '#225fa9',
+                                 '#a6a8ce',
+                                 '#f05132', '#bd2029')) +
+  scale_alpha_manual(values = c(1, 0.7)) +
+  #scale_colour_manual(values = c('#800026', '#fd8d3c'),
+  #                    labels = c('Current risk', 'Zero fishing\nmortality'),
+  #                    name = stringr::str_wrap('Conservation potential for sawfishes',
+  #                                             width = 25)) +
+  scale_x_continuous(position = 'bottom',
                      limits = c(0, 1.0),
                      breaks = seq(0, 1.0, 0.25)) +
   publication_theme() +
-  theme(legend.key = element_blank(),
-        legend.position = c(0.8, 0.92))
+  theme(legend.position = 'none') 
+  #theme(legend.key = element_blank(),
+  #      legend.position = c(0.8, 0.92))
 
 fish_plot
 
@@ -168,48 +179,52 @@ all_man <-
   mutate(country = countrycode(ISO3, 'iso3c', 'country.name')) %>% 
   mutate(country = dplyr::recode(country,
                                  'Myanmar (Burma)' = 'Myanmar')) %>% 
-  left_join(., sort_df, by = c('ISO3' = 'ISO3'))
+  left_join(., sort_df, by = c('ISO3' = 'ISO3')) %>% 
+  mutate(pred_bin = case_when(pred <= 0.2 ~ 'avlow',
+                              pred > 0.2 & pred <= 0.4 ~ 'blow',
+                              pred > 0.4 & pred <= 0.6 ~ 'cmod',
+                              pred > 0.6 & pred <= 0.8 ~ 'dhigh',
+                              pred > 0.8 & pred <= 1 ~ 'evhigh'))
 
 head(all_man)
 
 man_plot <- 
   ggplot(all_man, aes(x = pred, 
                        y = reorder(country, -sort_id), 
-                       colour = level_pred)) +
+                       colour = pred_bin,
+                      alpha = level_pred)) +
+  geom_vline(xintercept = 0.5, colour = 'grey70') + 
   geom_line(data = all_man, aes(x = pred, y = reorder(country, -sort_id), 
                                  group = country),
             colour = 'grey40') +
   geom_point(size = 5) +
-  geom_vline(xintercept = 0.5, colour = 'grey70') + 
   labs(y = '',
        x = 'Probability of extinction') +
-  scale_colour_manual(values = c('#004529', '#41ab5d'),
-                      labels = c('Current risk', '10% increase in\nmangrove area'),
-                      name = stringr::str_wrap('Conservation potential for sawfishes',
-                                               width = 25)) +
-  scale_x_continuous(position = 'top',
+  scale_colour_manual(values = c('#231f20', '#225fa9',
+                                 '#a6a8ce',
+                                 '#f05132', '#bd2029')) +
+  scale_alpha_manual(values = c(1, 0.7)) +
+  #scale_colour_manual(values = c('#004529', '#41ab5d'),
+  #                    labels = c('Current risk', '10% increase in\nmangrove area'),
+  #                    name = stringr::str_wrap('Conservation potential for sawfishes',
+  #                                             width = 25)) +
+  scale_x_continuous(position = 'bottom',
                      limits = c(0, 1.0),
                      breaks = seq(0, 1.0, 0.25)) +
   publication_theme() +
-  theme(legend.key = element_blank(),
-        legend.position = c(0.8, 0.92))
+  theme(legend.position = 'none',
+        plot.background = element_rect(fill = 'transparent', colour = NA),
+        panel.background = element_rect(fill = 'transparent', colour = 'transparent'))
+  #theme(legend.key = element_blank(),
+  #      legend.position = c(0.8, 0.92))
 
 man_plot
 
 goldilocks <- 
-  plot_grid(fish_plot, man_plot, ncol = 2)
+  plot_grid(fish_plot, NULL, man_plot, ncol = 3,
+            rel_widths = c(1, -0.15, 1), align = 'hv')
 
 goldilocks
 
-ggsave('../../../Figures/Publication/Goldilocks_191217.pdf', goldilocks,
+ggsave('../../../Figures/Publication/Goldilocks_191218.pdf', goldilocks,
        width = 30, height = 20, dpi = 600, units = c('cm'))
- 
-
-
-
-
-
-
-
-
-
