@@ -46,39 +46,6 @@ summary(mod_fishBin3)
 
 get_variables(mod_fishBin3)
 
-
-# traceplot of posteriors ----------------------------------------
-post_trace <- as.array(mod_fishBin3)
-
-trace_labels <- 
-  c('b_logCoastLength' = 'Coastline Length',
-    'b_fishBin3Low' = 'Low Fishing',
-    'b_fishBin3Moderate' = 'Moderate Fishing',
-    'b_Intercept' = 'High Fishing')
-
-bayesplot::color_scheme_set('blue')
-trace_plots <- 
-  bayesplot::mcmc_trace(post_trace, pars = c('b_logCoastLength',
-                                             'b_fishBin3Low',
-                                             'b_fishBin3Moderate',
-                                             'b_Intercept'),
-                        facet_args = list(ncol = 1, strip.position = 'left',
-                                          labeller = as_labeller(trace_labels))) +
-  theme(strip.placement = 'outside',
-        strip.background = element_blank(),
-        strip.text = element_text(vjust = 0.8, colour = 'grey20',
-                                  size = 12),
-        legend.text = element_text(colour = 'grey20'),
-        legend.title = element_text(colour = 'grey20')) +
-  publication_theme() +
-  labs(y = 'Coefficients') +
-  guides(colour = guide_legend(override.aes = list(size = 2)))
-
-trace_plots
-
-#ggsave('../../../Figures/EcoCarryCapacity/TracePlot_191017.pdf', trace_plots,
-#       height = 22, width = 30.58, units = c('cm'))
-
 # plot with draws ---------------
 set.seed(123)
 
@@ -251,6 +218,39 @@ loo(mod_fishcont_int)
 
 get_variables(mod_fishcont)
 
+# traceplot of posteriors ----------------------------------------
+post_trace <- as.array(mod_fishcont)
+
+trace_labels <- 
+  c('b_logCoastLength' = 'log Coastline length',
+    'b_logProteinDiet' = 'log Fishing pressure',
+    'b_Intercept' = 'Intercept')
+
+bayesplot::color_scheme_set('blue')
+trace_plots <- 
+  bayesplot::mcmc_trace(post_trace, pars = c('b_logCoastLength',
+                                             'b_logProteinDiet',
+                                             'b_Intercept'),
+                        facet_args = list(ncol = 1, strip.position = 'left',
+                                          labeller = as_labeller(trace_labels))) +
+  theme(strip.placement = 'outside',
+        strip.background = element_blank(),
+        strip.text = element_text(vjust = 0.8, colour = 'grey20',
+                                  size = 12),
+        legend.text = element_text(colour = 'grey20'),
+        legend.title = element_text(colour = 'grey20'),
+        legend.key = element_blank()) +
+  publication_theme() +
+  labs(y = 'Coefficients') +
+  guides(colour = guide_legend(override.aes = list(size = 2)))
+
+trace_plots
+
+ggsave('../../../Figures/EcoCarryCapacity/TracePlot_191218.pdf', trace_plots,
+       height = 22, width = 30.58, units = c('cm'))
+
+
+
 # posterior of continuous variables --------------
 # need to plot the density plots separately because facet_wrap fucks the alignment later
 post_values <- 
@@ -258,6 +258,14 @@ post_values <-
   gather(key = intercept) %>%
   dplyr::filter(intercept != 'b_Intercept')
 
+mod_diag <- 
+  post_values %>% 
+  mutate(post_class = case_when(value >= 0 ~ 'positive',
+                                value < 0 ~ 'negative')) %>% 
+  group_by(intercept, post_class) %>% 
+  summarise(n = n())
+  
+mod_diag
 
 post_coast <- 
   post_values %>% 
