@@ -2,6 +2,17 @@
 
 library(tidyverse)
 library(irr)
+library(broom)
+library(psych)
+
+publication_theme <- function(axis_text_size = 13) {
+  theme(panel.background = element_blank(),
+        panel.grid = element_blank(),
+        axis.line.y = element_line(colour = 'grey60'),
+        axis.line.x = element_line(colour = 'grey60'),
+        axis.text = element_text(size = axis_text_size, colour = 'grey20'),
+        axis.title = element_text(size = 15))
+}
 
 setwd('../../../ModelOutputs/GBM/')
 
@@ -58,96 +69,69 @@ cutoff_data <-
          Pred_50 = case_when(PredValue <= 0.50 ~ 0,
                              PredValue > 0.50 ~ 1,
                              TRUE ~ as.numeric(PredValue))) %>% 
-  arrange(RunNo)
+  dplyr::select(-PredValue) %>% 
+  pivot_longer(cols = starts_with('Pred_'), 
+               names_to = 'cutoff_value',
+               values_to = 'pred') %>% 
+  arrange(cutoff_value)
+  
 
 head(cutoff_data)  
+
+# function to turn kappa output into a dataframe 
+tidy_kappa <- function(x) {
+  broom::fix_data_frame(x$confid, newcol = "type")
+}
+
+kappa <- 
+  cutoff_data %>% 
+  group_by(RunNo, cutoff_value) %>% 
+  do(tidy_kappa(cohen.kappa(cbind(.$occurrence, .$pred))))
+
+head(kappa)
+
+kappa_clean <- 
+  kappa %>% 
+  arrange(cutoff_value) %>% 
+  group_by(cutoff_value, type) %>% 
+  summarise(mean_k = mean(estimate),
+            sd_k = sd(estimate))
+
+kappa_plot <- 
+  kappa %>% 
+  mutate(cut_num = case_when(cutoff_value == 'Pred_30' ~ 30,
+                             cutoff_value == 'Pred_35' ~ 35,
+                             cutoff_value == 'Pred_40' ~ 40,
+                             cutoff_value == 'Pred_45' ~ 45,
+                             cutoff_value == 'Pred_50' ~ 50)) %>% 
+  dplyr::filter(type == 'weighted kappa') %>% 
+  ggplot(aes(x = cut_num, y = estimate, 
+             colour = cutoff_value, fill = cutoff_value)) +
+  geom_violin(trim = FALSE, alpha = 0.5) +
+  #geom_boxplot(aes(group = cut_num)) +
+  #geom_point(size = 2, alpha = 0.5, colour = 'darkslategray',
+  #           position = position_jitterdodge()) +
+  expand_limits(y = c(0.25, 0.55)) +
+  publication_theme()
   
-# now let's calculate kappa
-test <- 
-  cutoff_data %>% 
-  dplyr::select(RunNo, occurrence, Pred_30)
 
-test
-
-kappa_30 <- 
-  kappa2(test[, c(2, 3)])
-
-kappa_30
-str(kappa_30)
-kappa_30$value
-
-# I want to group_by RunNo and calculate the kappa between the
-# true occurrence and the predicted cutoff
-# so I want a df with a column RunNo, pred cut-off, and kapa number
-
-long_cutoff <- 
-  cutoff_data %>% 
-  dplyr::select(-ISO3, -PredValue) %>% 
-  gather(key = pred_value, value = measurement, -occurrence, -RunNo)
-
-head(long_cutoff)
-
-kappa_calc <- 
-  long_cutoff %>% 
-  group_by(RunNo, pred_value) %>% 
-  do(kappa2())
-
-# this works! Lit try to extract the kappa value to put into it's own dataframe
-test <- 
-  long_cutoff %>% 
-  dplyr::filter(pred_value == 'Pred_30') %>% 
-  select(occurrence, measurement) %>% 
-  as.data.frame() %>% 
-  kappa2(.)
+kappa_plot
 
 
 
-str(test)
 
-kappa_table <- data.frame()
-new_kappa <- data.frame()
 
-all_kappas <- 
-  lapply(c('Pred_30', 'Pred_35', 'Pred_40', 'Pred_45', 'Pred_50'), 
-         function(x) {
-    
-    # select column occurrence and cutoff 
-    df <- 
-      cutoff_data %>% 
-      dplyr::select(RunNo, occurrence, x)
-    
-    # now calculate a kappa value for each run
-    for(i in 1:1000) {
-      
-      df2 <- 
-        df %>% 
-        dplyr::filter(RunNo == i)
-      
-      kappa_value <- 
-        kappa2(df2[, c(2, 3)])
-      
-      kappa_table$kappa[i] <- kappa_value$value
-      
-    }
-    return(kappa_table)
-  })
 
-pred30 <- 
-  all_kappas[[1]] %>% 
-  dplyr::rename('Pred_30' = 'kappa')
 
-head(pred30)
 
-rename_kappa <- 
-  function(data_no, newname) {
-    
-    the_data <- 
-      all_kappas[[data_no]] %>% 
-      dplyr::rename_(paste(newname) = kappa)
-    
-    return(the_data)
-    
-  }
 
-pred30 <- rename_kappa(1, 'Pred_30')
-head(pred30)
+
+
+
+
+
+
+
+
+
+
