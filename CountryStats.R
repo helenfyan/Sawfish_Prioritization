@@ -79,6 +79,22 @@ lost <-
   left_join(., pres_still, by = c('ISO3' = 'ISO3')) %>% 
   mutate(lost = hist_spp - present_spp)
 
+one_lost <- 
+  lost %>% 
+  dplyr::filter(lost == 1) %>% 
+  mutate(country = countrycode(ISO3, 'iso3c', 'country.name'))
+
+two_lost <- 
+  lost %>% 
+  dplyr::filter(lost == 2) %>% 
+  distinct(ISO3, .keep_all = TRUE) %>% 
+  mutate(country = countrycode(ISO3, 'iso3c', 'country.name'))
+
+three_lost <- 
+  lost %>% 
+  dplyr::filter(lost == 3) %>% 
+  mutate(country = countrycode(ISO3, 'iso3c', 'country.name'))
+
 # number of unknowns
 unknwn <- 
   allspp %>% 
