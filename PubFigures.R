@@ -585,10 +585,11 @@ library(rgdal)
 library(rasterVis)
 library(remotes)
 library(sf)
+library(fishualize)
 
-searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_191202.csv')
+searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_200115.csv')
 searchCoord <- 
-  read_csv('../../../Datasets/SawfishSearchCountriesComplete_191202.csv')
+  read_csv('../../../Datasets/SawfishSearchCountriesComplete_200115.csv')
 
 # want long style where twe have a study type in the country - size of the dot
 # corresponding to the number of studies done in the area
@@ -609,23 +610,30 @@ searchClean <-
   # filter out eDNA and direct survey
   #dplyr::filter(!method %in% c('direct_survey', 'eDNA')) %>% 
   # remove eDNA
-  dplyr::filter(method != 'eDNA') %>% 
+  #dplyr::filter(method != 'eDNA') %>% 
   mutate(method = recode(method,
-                         'fisheries' = 'Bather Protection Nets & Fisheries',
-                         'bather_net' = 'Bather Protection Nets & Fisheries',
-                         'collection' = 'Museum Records',
-                         'museum' = 'Museum Records',
-                         'media' = 'Media Reports',
-                         'historical_data' = 'Media Reports',
-                         'direct_survey' = 'Literature & Expert Advice',
-                         'encounter_data' = 'Literature & Expert Advice',
-                         'literature' = 'Literature & Expert Advice',
-                         'expert' = 'Literature & Expert Advice',
-                         'photo' = 'Photographs',
-          'fishers_ecological_knowledge' = "Fishers' Ecological Knowledge")) %>% 
+                         'fisheries' = 'Bather protection nets & fisheries',
+                         'bather_net' = 'Bather protection nets & fisheries',
+                         'collection' = 'Museum records',
+                         'museum' = 'Museum records',
+                         'media' = 'Historical media reports',
+                         'historical_data' = 'Historical media reports',
+                         'direct_survey' = 'Literature & expert advice',
+                         'encounter_data' = 'Literature & expert advice',
+                         'literature' = 'Literature & expert advice',
+                         'expert' = 'Literature & expert advice',
+                         'photo' = 'Historical photographs',
+                         'eDNA' = 'Literature & expert advice',
+          'fishers_ecological_knowledge' = "Traditional ecological knowledge surveys")) %>% 
   group_by(country, method) %>% 
   summarise(total = n()) %>% 
-  left_join(searchCoord, by = c('country' = 'country'))
+  left_join(searchCoord, by = c('country' = 'country')) %>% 
+  mutate(method = factor(method, levels = c("Traditional ecological knowledge surveys",
+                                            'Bather protection nets & fisheries',
+                                            'Literature & expert advice',
+                                            'Historical media reports',
+                                            'Museum records',
+                                            'Historical photographs')))
   
 
 unique(searchClean$method)
@@ -645,7 +653,7 @@ methodsMap <-
   ggplot() +
   geom_sf(data = map_shp, colour = 'grey90', fill = 'grey80', size = 0.2) +
   geom_point(data = searchClean, aes(x = long, y = lat, colour = method, size = total),
-             alpha = 0.5) +
+             alpha = 0.5, position = position_jitter(width = 1, height = 1)) +
   theme(panel.background = element_blank(),
         panel.border = element_blank(),
         axis.title = element_blank(),
@@ -653,18 +661,21 @@ methodsMap <-
         axis.ticks = element_blank(),
         legend.key = element_blank(),
         legend.background = element_rect(fill = 'white'),
-        legend.position = c(0.17, 0.25),
+        legend.position = c(0.14, 0.25),
         legend.text = element_text(size = 11),
         legend.title = element_text(size = 13)) +
   guides(size = FALSE,
          colour = guide_legend(override.aes = list(size = 6,
                                                    alpha = 0.8))) +
   labs(colour = 'Method') +
-  scale_size(range = c(6, 18))
+  scale_size(range = c(6, 18)) +
+  scale_color_fish(option = 'Scarus_quoyi', direction = 1,
+                   discrete = TRUE)
+  
 
 methodsMap
 
-ggsave('../../../Figures/Publication/Maps/MapMethods_191208.png', methodsMap, 
+ggsave('../../../Figures/Publication/Maps/MapMethods_200115.png', methodsMap, 
        height = 20, width = 30, units = c('cm'), dpi = 600)
 
 # ------------------------------------------------------------------
