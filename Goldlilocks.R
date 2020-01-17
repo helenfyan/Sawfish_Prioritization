@@ -154,10 +154,10 @@ fish_plot <-
   geom_point(size = 5) +
   labs(y = '',
        x = 'Probability of extinction') +
-  scale_colour_manual(values = c('#231f20', '#225fa9',
+  scale_colour_manual(values = c('#1e2456', '#225fa9',
                                  '#a6a8ce',
                                  '#f05132', '#bd2029')) +
-  scale_alpha_manual(values = c(1, 0.7)) +
+  scale_alpha_manual(values = c(1, 0.5)) +
   #scale_colour_manual(values = c('#800026', '#fd8d3c'),
   #                    labels = c('Current risk', 'Zero fishing\nmortality'),
   #                    name = stringr::str_wrap('Conservation potential for sawfishes',
@@ -200,10 +200,10 @@ man_plot <-
   geom_point(size = 5) +
   labs(y = '',
        x = 'Probability of extinction') +
-  scale_colour_manual(values = c('#231f20', '#225fa9',
+  scale_colour_manual(values = c('#1e2456', '#225fa9',
                                  '#a6a8ce',
                                  '#f05132', '#bd2029')) +
-  scale_alpha_manual(values = c(1, 0.7)) +
+  scale_alpha_manual(values = c(1, 0.5)) +
   #scale_colour_manual(values = c('#004529', '#41ab5d'),
   #                    labels = c('Current risk', '10% increase in\nmangrove area'),
   #                    name = stringr::str_wrap('Conservation potential for sawfishes',
@@ -226,5 +226,5 @@ goldilocks <-
 
 goldilocks
 
-ggsave('../../../Figures/Publication/Goldilocks_191218.pdf', goldilocks,
+ggsave('../../../Figures/Publication/Goldilocks_200117.pdf', goldilocks,
        width = 30, height = 20, dpi = 600, units = c('cm'))
