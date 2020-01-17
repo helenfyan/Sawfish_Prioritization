@@ -303,7 +303,8 @@ post_fish <-
   labs(y = 'log Fishing pressure',
        x = 'Coefficient estimate') +
   theme(plot.margin = unit(c(0, 0.5, 0.1, 0.5), 'cm'),
-        axis.title.y = element_text(size = 12, colour = 'grey20'))
+        axis.title.y = element_text(size = 12, colour = 'grey20'),
+        axis.title.x = element_text(size = 12, colour = 'grey20'))
 
 post_plots <- 
   grid.arrange(post_coast, post_fish, ncol = 1)
@@ -388,7 +389,7 @@ preds_fitlines_protein <-
                                  'Maximum')) +
   publication_theme() +
   labs(y = 'Occupancy',
-       x = 'log Coastline length') +
+       x = 'Habitat availability (log coastline length)') +
   geom_hline(yintercept = 0.05, colour = 'grey20', linetype = 'solid',
              size = 1.2)
   
@@ -446,7 +447,8 @@ plot_5 <-
   theme(legend.position = 'none',
         plot.margin = unit(c(0.1, 0.5, 0.1, 0.5), 'cm'),
         axis.title.y = element_text(size = 12),
-        axis.text.x = element_text(size = 11)) +
+        axis.text.x = element_text(size = 11),
+        axis.title.x = element_text(size = 12)) +
   labs(y = 'log Coastline length',
        x = 'log Fishing pressure')
 
@@ -468,7 +470,7 @@ fit_post_5 <-
 
 fit_post_5
 
-ggsave('../../../Figures/EcoCarryCapacity/DgPost5_191203.pdf',
+ggsave('../../../Figures/EcoCarryCapacity/DgPost5_200117.pdf',
        fit_post_5, height = 20, width = 30, units = c('cm'))
 
 
