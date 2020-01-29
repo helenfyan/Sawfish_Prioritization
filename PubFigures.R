@@ -587,7 +587,7 @@ library(remotes)
 library(sf)
 library(fishualize)
 
-searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_200115.csv')
+searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_200128.csv')
 searchCoord <- 
   read_csv('../../../Datasets/SawfishSearchCountriesComplete_200115.csv')
 
@@ -605,6 +605,7 @@ searchClean <-
   gather(key = key, value = country, country1:country25) %>% 
   mutate(country = dplyr::recode(country, 'coasta rica' = 'costa rica')) %>% 
   dplyr::select(-key) %>% 
+  dplyr::select(-X39, -X40, -X41) %>% 
   drop_na() %>% 
   mutate(method = gsub(' ', '_', method)) %>% 
   # filter out eDNA and direct survey
@@ -637,6 +638,7 @@ searchClean <-
   
 
 unique(searchClean$method)
+head(searchClean)
 
 # make a dataframe of the countries 
 #searchCountries <- 
@@ -651,7 +653,7 @@ map_shp <-
 
 methodsMap <- 
   ggplot() +
-  geom_sf(data = map_shp, colour = 'grey90', fill = 'grey80', size = 0.2) +
+  geom_sf(data = map_shp, colour = 'grey90', fill = 'grey80', size = 0.3) +
   geom_point(data = searchClean, aes(x = long, y = lat, colour = method, size = total),
              alpha = 0.5, position = position_jitter(width = 1, height = 1)) +
   theme(panel.background = element_blank(),
@@ -660,13 +662,10 @@ methodsMap <-
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         legend.key = element_blank(),
-        legend.background = element_rect(fill = 'white'),
-        legend.position = c(0.14, 0.25),
-        legend.text = element_text(size = 11),
-        legend.title = element_text(size = 13)) +
-  guides(size = FALSE,
-         colour = guide_legend(override.aes = list(size = 6,
-                                                   alpha = 0.8))) +
+        legend.position = 'none') +
+  #guides(size = FALSE,
+  #       colour = guide_legend(override.aes = list(size = 9,
+  #                                                 alpha = 0.8))) +
   labs(colour = 'Method') +
   scale_size(range = c(6, 18)) +
   scale_color_fish(option = 'Scarus_quoyi', direction = 1,
@@ -675,7 +674,7 @@ methodsMap <-
 
 methodsMap
 
-ggsave('../../../Figures/Publication/Maps/MapMethods_200115.png', methodsMap, 
+ggsave('../../../Figures/Publication/Maps/MapMethods_200128.png', methodsMap, 
        height = 20, width = 30, units = c('cm'), dpi = 600)
 
 # ------------------------------------------------------------------
