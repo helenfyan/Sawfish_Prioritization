@@ -32,6 +32,12 @@ head(allspp)
 lapply(allspp, function(x) sum(is.na(x)))
 
 # clean dataframe for danielle to analyze ----------------------
+# historical distribution of sawfishes
+hist <- 
+  allspp %>% 
+  group_by(ISO3) %>% 
+  summarise(hist_spp = sum(nosppHist))
+
 # make a column for predictions 
 pred_raw <- read_csv('../../../Datasets/GBMPredictedMeans_190122.csv') %>% 
   dplyr::select(-X1)
@@ -43,29 +49,49 @@ pred <-
                             value <= 0.25 ~ 'extinct',
                             TRUE ~ as.character('middle'))) %>% 
   dplyr::filter(action != 'middle') %>% 
+  dplyr::filter(action == 'protect') %>% 
   dplyr::select(-value)
 
 head(pred)
 
-area_calc <- 
+present <- 
   allspp %>% 
-  dplyr::select(-refid, -nosppNow, -nosppHist) %>% 
+  dplyr::select(ISO3, presence) %>% 
+  dplyr::filter(presence == 'present') %>% 
+  distinct(ISO3, .keep_all = TRUE) %>% 
+  mutate(action = 'protect') %>% 
+  dplyr::select(-presence)
+
+head(present)
+
+protect <- 
+  rbind(pred, present)
+
+View(protect)
+
+area_calc <- 
+  hist %>% 
   dplyr::filter(ISO3 != 'LAO') %>% 
-  spread(species, presence) %>% 
-  left_join(., pred, by = c('ISO3' = 'ISO3'))
-
-
+  dplyr::select(-hist_spp) %>% 
+  mutate(historical = 'yes') %>% 
+  left_join(., protect, by = c('ISO3' = 'ISO3')) %>% 
+  mutate(protection = case_when(action == 'protect' ~ 'yes',
+                                is.na(action) ~ 'no')) %>% 
+  dplyr::select(-action) %>% 
+  # remove duplicates
+  mutate(refid = paste(protection, ISO3, sep = '_')) %>% 
+  distinct(refid, .keep_all = TRUE) %>% 
+  dplyr::select(-refid) %>% 
+  mutate(country = countrycode(ISO3, 'iso3c', 'country.name')) %>% 
+  .[, c(4, 1:3)]
+  
 head(area_calc)
 View(area_calc)
 
-write_csv(area_calc, '../../../Datasets/SawfishOccurrence_191209.csv')
+write_csv(area_calc, '../../../Datasets/AreaCalc_200128.csv')
 
-# historical distribution of sawfishes
-hist <- 
-  allspp %>% 
-  group_by(ISO3) %>% 
-  summarise(hist_spp = sum(nosppHist))
 
+# country summaries ------------------------------------------------
 # number of species still present 
 pres_still <- 
   allspp %>% 
