@@ -587,7 +587,7 @@ library(remotes)
 library(sf)
 library(fishualize)
 
-searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_200128.csv')
+searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_200207.csv')
 searchCoord <- 
   read_csv('../../../Datasets/SawfishSearchCountriesComplete_200115.csv')
 
@@ -653,7 +653,7 @@ map_shp <-
 
 methodsMap <- 
   ggplot() +
-  geom_sf(data = map_shp, colour = 'grey90', fill = 'grey80', size = 0.3) +
+  geom_sf(data = map_shp, colour = '#D4D4D4', fill = '#C8C8C8', size = 0.3) +
   geom_point(data = searchClean, aes(x = long, y = lat, colour = method, size = total),
              alpha = 0.5, position = position_jitter(width = 1, height = 1)) +
   theme(panel.background = element_blank(),
@@ -674,7 +674,7 @@ methodsMap <-
 
 methodsMap
 
-ggsave('../../../Figures/Publication/Maps/MapMethods_200128.png', methodsMap, 
+ggsave('../../../Figures/Publication/Maps/MapMethods_200207.png', methodsMap, 
        height = 20, width = 30, units = c('cm'), dpi = 600)
 
 # ------------------------------------------------------------------

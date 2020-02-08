@@ -6,8 +6,7 @@ library(modelr)
 library(tidybayes)
 library(brms)
 library(ggstance)
-library(cowplot)
-library(gridExtra)
+library(patchwork)
 library(fishualize)
 
 rstan_options(auto_write = TRUE)
@@ -200,6 +199,7 @@ summary(mod_fishcont_int)
 
 plot(mod_fishcont_int)
 
+# USE THIS MODEL ------------------------------------------------------
 mod_fishcont <- 
   brm(occurrence ~ logCoastLength + logProteinDiet,
       data = pc_data,
@@ -306,9 +306,9 @@ post_fish <-
         axis.title.y = element_text(size = 12, colour = 'grey20'),
         axis.title.x = element_text(size = 12, colour = 'grey20'))
 
-post_plots <- 
-  grid.arrange(post_coast, post_fish, ncol = 1)
-
+# don't need to use post_plots
+post_plots <- post_coast + post_fish + plot_layout(ncol = 1)
+post_plots
 #ggsave('../../../Figures/EcoCarryCapacity/DynamicGeographyContCoef_191130.pdf',
 #       post_plots, height = 20, width = 25, units = c('cm'))
 
@@ -454,33 +454,24 @@ plot_5 <-
 
 plot_5
 
-post_5 <- 
-  plot_grid(post_plots, plot_5, ncol = 1,
-            scale = 1, axis = 'lr')
+post_5 <- post_plots + plot_5 + plot_layout(ncol = 1, heights = c(0.5, 0.5, 1))
 
 post_5
 
 #ggsave('../../../Figures/EcoCarryCapacity/DensOcc5_191201.png',
 #       post_5, height = 20, width = 12, units = c('cm'))
 
+# combine all the plots into one
 fit_post_5 <- 
-  plot_grid(preds_fitlines_protein, post_5, ncol = 2,
-            rel_widths = c(2, 1), rel_heights = c(1, 1.3),
-            axis = 'b')
+  preds_fitlines_protein + 
+  {{post_coast + post_fish + plot_layout(ncol = 1)} +
+      plot_5 + plot_layout(ncol = 1, heights = c(0.5, 0.5, 1))} +
+  plot_layout(ncol = 2, widths = c(2, 1, 1, 1))
 
 fit_post_5
 
-ggsave('../../../Figures/EcoCarryCapacity/DgPost5_200117.pdf',
+ggsave('../../../Figures/EcoCarryCapacity/DgPost5_200207.pdf',
        fit_post_5, height = 20, width = 30, units = c('cm'))
-
-
-
-
-
-
-
-
-
 
 # do the same for gear-specific landings ---------------------------------------
 # make a model with gear-specific landings
