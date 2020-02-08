@@ -61,7 +61,7 @@ lowerTri <- getLowerTri(cormat)
 
 corfig <-
   melt(lowerTri, na.rm = TRUE) %>%
-  mutate(Var2 = dplyr::recode(Var2, 'logEstDis' = 'Estuaries discharge r (EDR)',
+  mutate(Var2 = dplyr::recode(Var2, 'logEstDis' = 'Estuarine discharge rate (EDR)',
                               'logPprodMean' = 'Primary productivity (PPD)',
                               'logFinUSD' = 'Fin exports (FXP)',
                               'logCoastPop' = 'Coastal population (CTP)',
@@ -80,7 +80,7 @@ corfig <-
                               'logtotalGearTonnes' = 'Gear-restricted landings (GLT)',
                               #'ReefFishers' = 'Reef Fishers (RFF)',
                               'logFishProd' = 'Marine fisheries production (MFP)',
-                              'logChondCatch' = 'Chondrichthyes catches (CHC)')) %>%
+                              'logChondCatch' = 'Chondrichthyan landings (CHL)')) %>%
   mutate(Var1 = dplyr::recode(Var1, 'logEstDis' = 'EDR',
                               'logPprodMean' = 'PPD',
                               'logFinUSD' = 'FXP',
@@ -100,7 +100,7 @@ corfig <-
                               'logtotalGearTonnes' = 'GLT',
                               #'ReefFishers' = 'RFF',
                               'logFishProd' = 'MFP',
-                              'logChondCatch' = 'CHC')) %>%
+                              'logChondCatch' = 'CHL')) %>%
   # reverse the order of x to get plot aligned with axes
   mutate(Var1 = as.factor(Var1)) %>%
   mutate(Var1 = factor(Var1, levels = rev(levels(Var1)))) %>%
