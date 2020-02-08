@@ -21,7 +21,7 @@ presentation_theme <- function(axis_text_size = 13, axis_y_ticks = element_line(
 
 library(reshape2)
 
-raw <- read_csv('ProcessedCovariates_190119.csv')
+raw <- read_csv('../../../Datasets/ProcessedCovariates_190119.csv')
 
 dat <- 
   raw %>% 
@@ -61,27 +61,27 @@ lowerTri <- getLowerTri(cormat)
 
 corfig <-
   melt(lowerTri, na.rm = TRUE) %>%
-  mutate(Var2 = dplyr::recode(Var2, 'logEstDis' = 'Estuaries Discharge (ESD)',
-                              'logPprodMean' = 'Primary Productivity (PPD)',
-                              'logFinUSD' = 'Fin Exports (FXP)',
-                              'logCoastPop' = 'Coastal Population (CTP)',
+  mutate(Var2 = dplyr::recode(Var2, 'logEstDis' = 'Estuaries discharge r (EDR)',
+                              'logPprodMean' = 'Primary productivity (PPD)',
+                              'logFinUSD' = 'Fin exports (FXP)',
+                              'logCoastPop' = 'Coastal population (CTP)',
                               #'logChondLand' = 'Chondrichthyes Landings (CHL)',
-                              'SstMean' = 'Sea Surface Temperature (SST)',
-                              'logMang' = 'Mangrove Area (MNG)',
+                              'SstMean' = 'Sea surface temperature (SST)',
+                              'logMang' = 'Mangrove area (MNG)',
                               'HDI' = 'Human Development Index (HDI)',
                               #'EPI' = 'Environmental Performance Index (EPI)',
                               'WGI' = 'World Governance Index (WGI)',
                               'OHI' = 'Ocean Health Index (OHI)',
                               'NBI' = 'National Biodiversity Index (NBI)',
-                              'logIuu' = 'Illegal Unreported and Unregulated Fishing (IUU)',
+                              'logIuu' = 'Illegal unreported and unregulated fishing (IUU)',
                               'logGDP' = 'Gross Domestic Product (GDP)',
                               'logCoastLength' = 'Coastline length (CLL)',
-                              'logProteinDiet' = 'Marine Protein Consumption (MPC)',
-                              'logtotalGearTonnes' = 'Gear-Restricted Landed Tonnes (GLT)',
+                              'logProteinDiet' = 'Marine protein consumption (MPC)',
+                              'logtotalGearTonnes' = 'Gear-restricted landings (GLT)',
                               #'ReefFishers' = 'Reef Fishers (RFF)',
-                              'logFishProd' = 'Marine Fisheries Production (MFP)',
-                              'logChondCatch' = 'Chondrichthyes Catches (CHC)')) %>%
-  mutate(Var1 = dplyr::recode(Var1, 'logEstDis' = 'ESD',
+                              'logFishProd' = 'Marine fisheries production (MFP)',
+                              'logChondCatch' = 'Chondrichthyes catches (CHC)')) %>%
+  mutate(Var1 = dplyr::recode(Var1, 'logEstDis' = 'EDR',
                               'logPprodMean' = 'PPD',
                               'logFinUSD' = 'FXP',
                               'logCoastPop' = 'CTP',
@@ -126,8 +126,8 @@ corfig <-
 
 print(corfig)
 
-ggsave('../Figures/Publication/CorHeatMap_190213.pdf', corfig,
-       height = 19.05, width = 30.59, units = c('cm'))
+ggsave('../../../Figures/Publication/CorHeatMap_200207.pdf', corfig,
+       height = 20, width = 30, units = c('cm'))
 
 #  -----------------------------------------------------------------
 #  Partial dependence plots ----------------------------------------
