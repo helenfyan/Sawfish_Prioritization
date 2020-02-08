@@ -471,7 +471,7 @@ fit_post_5 <-
 fit_post_5
 
 ggsave('../../../Figures/EcoCarryCapacity/DgPost5_200207.pdf',
-       fit_post_5, height = 20, width = 30, units = c('cm'))
+       fit_post_5, height = 21, width = 30, units = c('cm'))
 
 # do the same for gear-specific landings ---------------------------------------
 # make a model with gear-specific landings
