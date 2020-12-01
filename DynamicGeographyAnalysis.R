@@ -21,6 +21,480 @@ publication_theme <- function(axis_text_size = 13) {
         axis.title = element_text(size = 15))
 }
 
+# function to colour density plot based on amount crossing 0
+make_density <- 
+  function(data_frame, intercept_value, colour_right, 
+           colour_left, axis_title_size = 14) {
+    
+    # make basic plot to build on
+    basic_dens <- 
+      data_frame %>% 
+      dplyr::filter(intercept == intercept_value) %>% 
+      ggplot(aes(x = value)) +
+      geom_density(fill = colour_right, colour = 'grey50') +
+      expand_limits(x = c(-5.7, 11.4),
+                    y = c(0, 0.2)) +
+      geom_vline(xintercept = 0, colour = 'grey60',
+                 size = 0.7) +
+      theme(axis.line.x = element_blank(),
+            axis.line.y = element_line(colour = 'grey60'),
+            panel.grid = element_blank(),
+            panel.background = element_blank(),
+            axis.text.x = element_blank(),
+            axis.title.x = element_blank(),
+            axis.ticks.x = element_blank(),
+            axis.text.y = element_text(colour = 'grey40', size = 11),
+            axis.ticks.y = element_line(colour = 'grey40'),
+            axis.title.y = element_text(colour = 'grey20', size = axis_title_size),
+            plot.margin = unit(c(-0.08, 0, -0.08, 1), 'cm'))
+    
+    # make plot dataframe
+    dens_df <- 
+      ggplot_build(basic_dens)$data[[1]]
+    
+    plot <- 
+      basic_dens +
+      geom_area(data = dens_df %>% 
+                  dplyr::filter(x < 0), 
+                aes(x = x, y = y), fill = colour_left)
+    
+    return(plot)
+    
+  }
+
+# Fishing and mangrove area have the highest variable importances --------
+mod_data <- read_csv('../../../Datasets/ProcessedCovariates_200824.csv')
+
+full_mod <- 
+  brm(occurrence ~ logShelfAreaShallow + logtotalGearTonnes + logMang + (1|ISO3),
+      data = mod_data,
+      family = 'bernoulli',
+      seed = 123)
+
+summary(full_mod)
+quartz()
+plot(full_mod)
+
+#saveRDS(full_mod, '../../../ModelOutputs/DGShelfMangFish_200825.rds')
+full_mod <- readRDS('../../../ModelOutputs/DGShelfMangFish_200825.rds')
+
+# make density plots ------------------------------------------------------
+post_pred <- 
+  posterior_samples(full_mod, '^b') %>% 
+  gather(key = intercept) %>%
+  dplyr::filter(intercept != 'b_Intercept')
+
+head(post_pred)
+
+post_shelf <- 
+  make_density(post_pred, 'b_logShelfAreaShallow',
+               '#1d91c0', '#d3eef8', 10) +
+  labs(y = 'ln Shelf area')
+
+post_mang <- 
+  make_density(post_pred, 'b_logMang',
+               '#1d91c0', '#d3eef8', 10) +
+  labs(y = 'ln Mangrove area') +
+  scale_y_continuous(limits = c(0, 0.6),
+                     breaks = seq(0, 0.5, 0.25))
+
+post_fish <- 
+  make_density(post_pred, 'b_logtotalGearTonnes',
+               '#fbd0d2', '#a50f15', 10) +
+  theme(axis.text.x = element_text(size = 10, colour = 'grey40'),
+        axis.ticks.x = element_line(colour = 'grey40'),
+        axis.title.x = element_text(colour = 'grey20', size = 10),
+        axis.line.x = element_line(colour = 'grey60'),
+        plot.margin = unit(c(-0.08, 0, 0, 1), 'cm')) +
+  scale_y_continuous(limits = c(0, 0.63),
+                     breaks = seq(0, 0.5, 0.25)) +
+  labs(y = 'ln Fishing pressure',
+       x = 'Coefficient estimate')
+
+post_plots <- 
+  post_shelf + post_mang + post_fish + plot_layout(ncol = 1)
+
+post_plots
+
+# fitlines plot -----------------------------------------------------------
+quantile(mod_data$logtotalGearTonnes)
+
+QminF <- quantile(mod_data$logtotalGearTonnes, 0)
+Q1F <- quantile(c(0, max(mod_data$logtotalGearTonnes)), 0.25)
+Q2F <- quantile(c(0, max(mod_data$logtotalGearTonnes)), 0.5)
+Q3F <- quantile(c(0, max(mod_data$logtotalGearTonnes)), 0.75)
+QmaxF <- quantile(mod_data$logtotalGearTonnes, 1)
+
+quarts <- 
+  lapply(c(QminF, Q1F, Q2F, Q3F, QmaxF), function(x) {
+    
+    qs_df <- 
+     mod_data %>% 
+      #group_by(ISO3) %>% 
+      #data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+      data_grid(logShelfAreaShallow = seq(from = 0, to = 14.2, by = 0.1)) %>% 
+      #ungroup() %>% 
+      #data_grid(logCoastLength, ISO3) %>% 
+      mutate(logtotalGearTonnes = as.numeric(paste(x)),
+             logMang = mean(mod_data$logMang)) %>% 
+      add_fitted_draws(full_mod, n = 150,
+                       seed = 123,
+                       # ignore group-level effects
+                       re_formula = NA)
+    
+    return(qs_df)
+    
+  })
+
+pred_Qf <- 
+  do.call(rbind, quarts)
+
+pred_meansQ <- 
+  pred_Qf %>% 
+  group_by(logtotalGearTonnes, logShelfAreaShallow) %>% 
+  summarise(mean_val = mean(.value))
+
+fitlines_fish <- 
+  #ggplot(pred_qsP, aes(x = logCoastLength, y = occurrence, 
+  #                    colour = factor(logProteinDiet))) +
+  # change it so there are no posterior draws for zero and max
+  pred_Qf %>% 
+  #dplyr::filter(!logProteinDiet %in% c(QminP, QmaxP)) %>% 
+  ggplot(aes(x = logShelfAreaShallow, y = occurrence,
+             colour = factor(logtotalGearTonnes))) +
+  geom_line(aes(y = .value, group = paste(logtotalGearTonnes, .draw)), 
+            alpha = 0.15) +
+  geom_smooth(data = pred_meansQ, aes(x = logShelfAreaShallow, y = mean_val,
+                                      colour = factor(logtotalGearTonnes)),
+              se = FALSE, fullrange = TRUE,
+              method = 'glm', 
+              method.args = list(family = 'quasibinomial'),
+              size = 2) +
+  geom_point(data = mod_data, size = 6, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme(legend.position = 'none') +
+  #legend.key = element_rect(fill = NA),
+  #legend.title = element_text(size = 14, colour = 'grey20'),
+  #legend.text = element_text(size = 13, colour = 'grey20')) +
+  guides(colour = guide_legend(override.aes = list(size = 2,
+                                                   alpha = 0.8))) +
+  scale_colour_manual(values = c('#fc9272', '#fb6a4a',
+                                 '#ef3b2c', '#a50f15',
+                                 '#67000d'),
+                      name = 'Fishing\npressure',
+                      labels = c('Zero',
+                                 'Low',
+                                 'Moderate',
+                                 'High',
+                                 'Maximum')) +
+  publication_theme() +
+  expand_limits(x = c(2.5, 14.5)) +
+  labs(y = 'Occupancy',
+       x = 'Habitat availability (ln Shelf Area)') +
+  geom_hline(yintercept = 0.05, colour = 'grey20', linetype = 'solid',
+             size = 1.2)
+
+fitlines_fish
+
+# 5% occupancy plot --------------------------------------------------
+head(pred_Qf)
+
+pred_5 <- 
+  pred_Qf %>% 
+  mutate(.value = round(.value, 2)) %>% 
+  dplyr::filter(.value == 0.05) %>% 
+  # janky way of dealing with this but whatever
+  mutate(fishBin1 = round(logtotalGearTonnes, 0),
+         fishBin = case_when(fishBin1 == 0 ~ 'Zero',
+                             fishBin1 == 5 ~ 'Low',
+                             fishBin1 == 10 ~ 'Moderate',
+                             fishBin1 == 14 ~ 'High',
+                             fishBin1 == 19 ~ 'Maximum'),
+         fishBin = factor(fishBin, levels = c('Zero', 'Low',
+                                              'Moderate', 'High',
+                                              'Maximum')))
+
+
+pred_5_med <- 
+  pred_5 %>% 
+  group_by(fishBin) %>% 
+  summarise(med_f = median(logShelfAreaShallow),
+            sd_f = sd(logShelfAreaShallow),
+            n = n(),
+            se_f = sd_f/sqrt(n),
+            ci_95 = se_f*1.96) %>% 
+  ungroup() %>% 
+  mutate(fishBin = factor(fishBin, levels = c('Zero', 'Low',
+                                              'Moderate', 'High',
+                                              'Maximum')),
+         line_val = case_when(fishBin == 'Zero' ~ 1,
+                              fishBin == 'Low' ~ 2,
+                              fishBin == 'Moderate' ~ 3,
+                              fishBin == 'High' ~ 4,
+                              fishBin == 'Maximum' ~ 5))
+
+plot_5 <- 
+  ggplot(pred_5, aes(x = fishBin, y = logShelfAreaShallow,
+                     fill = fishBin, colour = fishBin)) +
+  geom_point(size = 2, alpha = 0.4, 
+             position = position_jitter(width = 0.15)) +
+  geom_violin(trim = FALSE, alpha = 0.6, colour = NA) + 
+  geom_segment(data = pred_5_med, 
+               aes(x = line_val - 0.4, xend = line_val + 0.4,
+                   y = med_f, yend = med_f),
+               colour = 'grey20',
+               lwd = 1.5) +
+  scale_fill_manual(values = c('#fc9272', '#fb6a4a',
+                               '#ef3b2c', '#a50f15',
+                               '#67000d')) +
+  scale_colour_manual(values = c('#fc9272', '#fb6a4a',
+                                 '#ef3b2c', '#a50f15',
+                                 '#67000d')) +
+  publication_theme() +
+  #scale_y_continuous(limits = c(1, 13.5),
+  #                   breaks = seq(1.5, 13.5, 2)) +
+  theme(legend.position = 'none',
+        plot.margin = unit(c(0.1, 0.5, 0.1, 0.5), 'cm'),
+        axis.title.y = element_text(size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        plot.background = element_rect(fill = 'transparent')) +
+  labs(y = 'ln Shelf area',
+       x = 'ln Fishing pressure')
+
+plot_5
+
+# combine all the plots into one
+dg_plot <- 
+  fitlines_fish + 
+  {{post_shelf + post_mang + post_fish + plot_layout(ncol = 1)} +
+      plot_5 + plot_layout(ncol = 1, heights = c(0.5, 0.5, 0.5, 1))} +
+  plot_layout(ncol = 2, widths = c(2, 1, 1, 1, 1))
+
+dg_plot
+
+ggsave('../../../Figures/EcoCarryCapacity/DgPost5_200825.pdf',
+       dg_plot, height = 21, width = 30, units = c('cm'))
+
+
+# fitlines for mangrove area -----------------------------------------
+quantile(mod_data$logMang)
+
+QminM <- quantile(mod_data$logMang, 0)
+Q1M <- quantile(mod_data$logMang, 0.25)
+Q2M <- quantile(mod_data$logMang, 0.5)
+Q3M <- quantile(mod_data$logMang, 0.75)
+QmaxM <- quantile(mod_data$logMang, 1)
+
+quartsM <- 
+  lapply(c(QminM, Q1M, Q2M, Q3M, QmaxM), function(x) {
+    
+    qs_df <- 
+      mod_data %>% 
+      #group_by(ISO3) %>% 
+      #data_grid(logCoastLength = seq_range(logCoastLength, 101)) %>% 
+      data_grid(logShelfAreaShallow = seq(from = 2.4, to = 14.2, by = 0.1)) %>% 
+      #ungroup() %>% 
+      #data_grid(logCoastLength, ISO3) %>% 
+      mutate(logMang = as.numeric(paste(x)),
+             logtotalGearTonnes = mean(mod_data$logtotalGearTonnes)) %>% 
+      add_fitted_draws(full_mod, n = 150,
+                       seed = 123,
+                       # ignore group-level effects
+                       re_formula = NA)
+    
+    return(qs_df)
+    
+  })
+
+pred_QM <- 
+  do.call(rbind, quartsM)
+
+pred_meansQM <- 
+  pred_QM %>% 
+  group_by(logMang, logShelfAreaShallow) %>% 
+  summarise(mean_val = mean(.value))
+
+fitlines_mang <- 
+  pred_QM %>% 
+  ggplot(aes(x = logShelfAreaShallow, y = occurrence,
+             colour = factor(logMang))) +
+  geom_line(aes(y = .value, group = paste(logMang, .draw)), 
+            alpha = 0.15) +
+  geom_point(data = mod_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pred_meansQM, aes(x = logShelfAreaShallow, y = mean_val,
+                                      colour = factor(logMang)),
+              se = FALSE, fullrange = TRUE,
+              method = 'glm', 
+              method.args = list(family = 'quasibinomial'),
+              size = 1.5) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  scale_x_continuous(limits = c(2.4, 14.5),
+                     breaks = seq(2, 14, 2)) +
+  #guides(colour = guide_legend(override.aes = list(size = 2,
+  #                                                 alpha = 0.8))) +
+  scale_colour_manual(values = c('#d3eef8', '#7acbeb',
+                                 '#21a8de', '#146585',
+                                 '#0a3343'),
+                      name = 'Mangrove area',
+                      labels = c('Zero',
+                                 'Low',
+                                 'Moderate',
+                                 'High',
+                                 'Maximum')) +
+  publication_theme() +
+  theme(legend.position = c(0.15, 0.85),
+        legend.key = element_rect(fill = NA),
+        legend.title = element_text(size = 12, colour = 'grey20'),
+        legend.text = element_text(size = 11, colour = 'grey20')) +
+  labs(y = 'Occupancy',
+       x = 'Habitat availability (ln Shelf Area)') +
+  geom_hline(yintercept = 0.05, colour = 'grey20', linetype = 'solid',
+             size = 1.2) +
+  annotate("text", x = 13.5, y = 0.07, label = "5% Occupancy",
+           size = 4, colour = 'grey20')
+
+fitlines_mang
+
+# 5% occupancy for mangrove area -------------------------------------
+pred_5M <- 
+  pred_QM %>% 
+  mutate(.value = round(.value, 2)) %>% 
+  dplyr::filter(.value == 0.05) %>% 
+  # janky way of dealing with this but whatever
+  mutate(mangBin1 = round(logMang, 0),
+         mangBin = case_when(mangBin1 == 0 ~ 'Zero',
+                             mangBin1 == 3 ~ 'Low',
+                             mangBin1 == 5 ~ 'Moderate',
+                             mangBin1 == 7 ~ 'High',
+                             mangBin1 == 9 ~ 'Maximum'),
+         mangBin = factor(mangBin, levels = c('Zero', 'Low',
+                                              'Moderate', 'High',
+                                              'Maximum')))
+
+
+pred_5_medM <- 
+  pred_5M %>% 
+  group_by(mangBin) %>% 
+  summarise(med_f = median(logShelfAreaShallow),
+            sd_f = sd(logShelfAreaShallow),
+            n = n(),
+            se_f = sd_f/sqrt(n),
+            ci_95 = se_f*1.96) %>% 
+  ungroup() %>% 
+  mutate(mangBin = factor(mangBin, levels = c('Zero', 'Low',
+                                              'Moderate', 'High',
+                                              'Maximum')),
+         line_val = case_when(mangBin == 'Zero' ~ 1,
+                              mangBin == 'Low' ~ 2,
+                              mangBin == 'Moderate' ~ 3,
+                              mangBin == 'High' ~ 4,
+                              mangBin == 'Maximum' ~ 5))
+
+plot_5M <- 
+  ggplot(pred_5M, aes(x = mangBin, y = logShelfAreaShallow,
+                     fill = mangBin, colour = mangBin)) +
+  geom_point(size = 2, alpha = 0.4, 
+             position = position_jitter(width = 0.15)) +
+  geom_violin(trim = FALSE, alpha = 0.6, colour = NA) + 
+  geom_segment(data = pred_5_medM, 
+               aes(x = line_val - 0.4, xend = line_val + 0.4,
+                   y = med_f, yend = med_f),
+               colour = 'grey20',
+               lwd = 1.5) +
+  scale_fill_manual(values = c('#d3eef8', '#7acbeb',
+                               '#21a8de', '#146585',
+                               '#0a3343')) +
+  scale_colour_manual(values = c('#d3eef8', '#7acbeb',
+                                 '#21a8de', '#146585',
+                                 '#0a3343')) +
+  publication_theme() +
+  #scale_y_continuous(limits = c(1, 13.5),
+  #                   breaks = seq(1.5, 13.5, 2)) +
+  theme(legend.position = 'none',
+        plot.margin = unit(c(0.1, 0.5, 0.1, 0.5), 'cm'),
+        axis.title.y = element_text(size = 15),
+        axis.text.x = element_text(size = 13),
+        axis.title.x = element_text(size = 15),
+        plot.background = element_rect(fill = 'transparent')) +
+  labs(y = 'ln Shelf area',
+       x = 'ln Mangrove area')
+
+plot_5M
+
+mang <- 
+  fitlines_mang + plot_5M + plot_layout(ncol = 2, 
+                                        widths = c(1.5, 1)) +
+  plot_annotation(tag_levels = 'A') & theme(plot.tag = element_text(face = 'bold',
+                                                                    size = 18))
+
+mang
+
+
+ggsave('../../../Figures/Publication/DGmangrove_201118.png',
+       mang, height = 21, width = 30, units = c('cm'), dpi = 600)
+
+
+# this is all old code -----------------------------------------------
+# --------------------------------------------------------------------
+
+# bind all of them together
+pred_qsP <- 
+  rbind(quarts[[1]], quarts[[2]], quarts[[3]], quarts[[4]], quarts[[5]])
+
+# calculate means to draw mean line
+pred_meansP <- 
+  pred_qsP %>% 
+  group_by(logProteinDiet, logCoastLength) %>% 
+  summarise(mean_val = mean(.value))
+
+# plot this badboy
+preds_fitlines_protein <- 
+  #ggplot(pred_qsP, aes(x = logCoastLength, y = occurrence, 
+  #                    colour = factor(logProteinDiet))) +
+  # change it so there are no posterior draws for zero and max
+  pred_qsP %>% 
+  #dplyr::filter(!logProteinDiet %in% c(QminP, QmaxP)) %>% 
+  ggplot(aes(x = logCoastLength, y = occurrence,
+             colour = factor(logProteinDiet))) +
+  geom_line(aes(y = .value, group = paste(logProteinDiet, .draw)), 
+            alpha = 0.15) +
+  geom_point(data = pc_data, size = 4, shape = '|',
+             colour = 'grey60', alpha = 0.7) +
+  geom_smooth(data = pred_meansP, aes(x = logCoastLength, y = mean_val,
+                                      colour = factor(logProteinDiet)),
+              se = FALSE, fullrange = TRUE,
+              method = 'glm', 
+              method.args = list(family = 'quasibinomial'),
+              size = 1.5) +
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  theme(legend.position = 'none') +
+  #legend.key = element_rect(fill = NA),
+  #legend.title = element_text(size = 14, colour = 'grey20'),
+  #legend.text = element_text(size = 13, colour = 'grey20')) +
+  guides(colour = guide_legend(override.aes = list(size = 2,
+                                                   alpha = 0.8))) +
+  scale_colour_manual(values = c('#fc9272', '#fb6a4a',
+                                 '#ef3b2c', '#a50f15',
+                                 '#67000d'),
+                      name = 'Fishing\npressure',
+                      labels = c('Zero',
+                                 'Low',
+                                 'Moderate',
+                                 'High',
+                                 'Maximum')) +
+  publication_theme() +
+  labs(y = 'Occupancy',
+       x = 'Habitat availability (log coastline length)') +
+  geom_hline(yintercept = 0.05, colour = 'grey20', linetype = 'solid',
+             size = 1.2)
+
+preds_fitlines_protein
+
+
+# -------------------------------------------------------------------------
 pc_data <- 
   read_csv('../../../Datasets/DynamicGeographyBinned_190925.csv') %>% 
   mutate(fishBin3 = dplyr::recode(fishBin3,
@@ -107,41 +581,7 @@ post_values <-
   
 head(post_values)
 # to colour based on overlap with zero ------------------------
-make_density <- 
-  function(intercept_value, colour_right, colour_left) {
-    
-    # make basic plot to build on
-    basic_dens <- 
-      post_pred %>% 
-      dplyr::filter(intercept == intercept_value) %>% 
-      ggplot(aes(x = post_pred)) +
-      geom_density(fill = colour_right, colour = 'grey90') +
-      expand_limits(x = c(-23, 23),
-                    y = c(0, 0.2)) +
-      geom_vline(xintercept = 0, linetype = 'dashed', colour = 'grey60',
-                 size = 0.7) +
-      theme(axis.text = element_blank(),
-            axis.line.x = element_blank(),
-            axis.line.y = element_line(colour = 'grey60'),
-            panel.grid = element_blank(),
-            panel.background = element_blank(),
-            axis.title = element_blank(),
-            axis.ticks = element_blank(),
-            plot.margin = unit(c(-0.08, 0, 0, 1), 'cm'))
-      
-    # make plot dataframe
-    dens_df <- 
-      ggplot_build(basic_dens)$data[[1]]
-    
-    plot <- 
-      basic_dens +
-      geom_area(data = dens_df %>% 
-                  dplyr::filter(x < 0), 
-                aes(x = x, y = y), fill = colour_left)
-    
-    return(plot)
-    
-  }
+
 
 # changed function to include dataframe in command
 # these won't work
@@ -201,9 +641,30 @@ summary(mod_fishcont_int)
 
 plot(mod_fishcont_int)
 
+# ---------------------------------------------------------------------
 # USE THIS MODEL ------------------------------------------------------
-cont_data <- read_csv('../../../Datasets/ProcessedCovariates_181128.csv')
+# ---------------------------------------------------------------------
+cont_data <- read_csv('../../../Datasets/ProcessedCovariates_200824.csv')
 
+# let's see how this looks if we use shelf area instead of coastline length
+mod_fishshelf <- 
+  brm(occurrence ~ logShelfAreaDeep + logProteinDiet + (1|ISO3),
+      data = cont_data,
+      family = 'bernoulli',
+      seed = 123)
+
+quartz()
+summary(mod_fishshelf)
+plot(mod_fishshelf)
+
+kfold(mod_fishshelf, K = 10)
+kfold(mod_fishcont, K = 10)
+
+# based on k-fold cross validation, shelf area is the better model
+# kfoldic = 122.2 with se = 15.2 (shelf area)
+# kfoldic = 137.3 with se = 17.0 (coastline length)
+
+# model with coastline length as the measure of habitat availability
 fishcont_priors <- 
   get_prior(occurrence ~ logCoastLength + logProteinDiet + (1|ISO3),
              data = cont_data,

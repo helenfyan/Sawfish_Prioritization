@@ -12,9 +12,9 @@ library(dismo)
 library(beepr)
 library(countrycode)
 
-rawSpp <- read_csv('../../../Datasets/ProcessedCovariates_190119.csv')
+rawSpp <- read_csv('../../../Datasets/ProcessedCovariates_200824.csv')
 
-rawDD <- read_csv('../../../Datasets/ProcessedDataDeficients_190208.csv')
+rawDD <- read_csv('../../../Datasets/ProcessedDataDeficients_200824.csv')
 
 # regression tree analysis ---------------------------------
 
@@ -22,7 +22,10 @@ sppData <-
   rawSpp %>%
   # remove collinear covariates
   dplyr::select(-X1, -ISO3, -logFishProd, -logIuu,
-                -logChondLand, -EPI, -ReefFishers, -logFinUSD) %>%
+                -logChondLand, -EPI, -ReefFishers, -logFinUSD,
+                -logCoastLength, -logCoastLengthNew) %>%
+  # remove what the reviewers what
+  dplyr::select(-OHI, -NBI, -logShelfAreaDeep) %>% 
   as.data.frame()
 
 
@@ -50,15 +53,15 @@ trainIndex <- sample(1:n, ntrain)
 sppTrain <- sppData[trainIndex, ]
 sppTest <- sppData[-trainIndex, ]
 
-write.csv(sppTrain, '../../../Datasets/GBMtrain_191011.csv')
-write.csv(sppTest, '../../../Datasets/GBMtest_191011.csv')
+#write.csv(sppTrain, '../../../Datasets/GBMtrain_191011.csv')
+#write.csv(sppTest, '../../../Datasets/GBMtest_191011.csv')
 
 #sppTrain <- read_csv('../../../Datasets/GBMtrain_190119.csv')
 
 sppTrain <- 
   sppTrain %>% 
   # need to reorder for analysis
-  .[, c(6, 1:5, 7:20)] %>% 
+  #.[, c(6, 1:5, 7:18)] %>% 
   as.data.frame()
 
 #sppTest <- read_csv('../../../Datasets/GBMtest_190119.csv')
@@ -66,7 +69,7 @@ sppTrain <-
 sppTest <- 
   sppTest %>% 
   # need to reorder for analysis
-  .[, c(6, 1:5, 7:20)] %>% 
+  #.[, c(6, 1:5, 7:18)] %>% 
   as.data.frame()
 
 # tune a gbm to find hyperparameters ---------------------------
@@ -118,7 +121,7 @@ test <- gbm(formula = occurrence ~ .,
             data = sppTrain,
             n.trees = 5000,
             interaction.depth = 10,
-            shrinkage = 0.001,
+            shrinkage = 0.005,
             bag.fraction = 0.5,
             n.minobsinnode = 5,
             cv.folds = 10,
@@ -130,7 +133,7 @@ summary(test, cBars = 10)
 
 testpred <- predict(object = test,
                     newdata = sppTest,
-                    n.trees = 2700)
+                    n.trees = 5000)
 
 
 auc1 <- auc(actual = sppTest$occurrence, predicted = testpred)
@@ -140,7 +143,7 @@ print(auc1)
 # evaluate model performance and obtain performance values -----------------
 
 # make a df to infill with model eval values
-cvresults <- expand.grid(run = seq(1:1000),
+cvresults <- expand.grid(run = seq(1:100),
                          cvauc = 0,
                          cvdev = 0,
                          cvcorr = 0,
@@ -173,7 +176,8 @@ pred <- predict.gbm(object = test,
 # make empty list to infill with predictions of data-deficient values
 Predresults <- list()
 
-for(i in 1:1000) {
+# run this with coastline length (and no shelf area)
+for(i in 1:100) {
   
   # randomize the data everytime
   randomI <- sample(1:nrow(sppTrain), nrow(sppTrain))
@@ -181,7 +185,7 @@ for(i in 1:1000) {
   
   # run cv gbm
   cvgbm <- gbm.step(data = randomSpp,
-                    gbm.x = 2:20,
+                    gbm.x = 2:19,
                     gbm.y = 1,
                     family = 'bernoulli',
                     tree.complexity = 10,
@@ -201,6 +205,7 @@ for(i in 1:1000) {
                       newdata = sppTest,
                       n.trees = cvgbm$gbm.call$best.trees,
                       type = 'response')
+  
   cvresults$evauc[i] <- gbm.roc.area(sppTest$occurrence, pred)
   cvresults$evresdev[i] <- calc.deviance(sppTest$occurrence, pred, calc.mean = TRUE)
   cvresults$evnulldev[i] <- calc.deviance(sppTest$occurrence, 
@@ -228,10 +233,16 @@ for(i in 1:1000) {
   
   Predresults[[i]] <- pred
   
+  if (i%%2 == 0) {
+    
+    print(paste('Bootstrap ', i, ' done at ', Sys.time(), sep = ''))
+    
+  }
+  
 }
-beepr::beep()
+beepr::beep(sound = 8)
 
-write.csv(cvresults, 'BRTBootstrapResults_190208.csv')
+write.csv(cvresults, '../../../Datasets/GBM Out/200721/BRTBootstrapResultsCoastLength100_200721.csv')
 cvresults <- read_csv('BRTBootstrapResults_190208.csv')
 
 cvsummary <- 
@@ -243,7 +254,7 @@ cvsummary <-
 totalRI <- data.frame()
 totalPred <- data.frame()
 
-for(i in 1:1000) {
+for(i in 1:100) {
   
   # bind all relative influences
   ridf <- RIresults[[i]]
@@ -255,10 +266,10 @@ for(i in 1:1000) {
   
 }
 
-write.csv(totalPred, 'GBMPredicted_190208.csv')
+write.csv(totalPred, '../../../Datasets/GBM Out/200630/GBMPredictedCoastLength100_200630.csv')
 totalPred <- read_csv('../../../Datasets/GBMPredicted_190208.csv')
 
-write.csv(totalRI, 'GBMRelativeInf_190208.csv')
+write.csv(totalRI, '../../../Datasets/GBM Out/200630/GBMRelativeInfCoastLength100_200630.csv')
 totalRI <- read_csv('GBMRelativeInf_190208.csv')
 
 # calculate RI for each variable 
@@ -268,7 +279,7 @@ RIsum <-
   summarise(meanRI = mean(rel.inf),
             maxRI = max(rel.inf),
             minRI = min(rel.inf),
-            sdRI = dplyr::sd(rel.inf)) %>% 
+            sdRI = sd(rel.inf)) %>% 
   arrange(desc(meanRI))
 
 # calculate RI for each index 
@@ -303,7 +314,7 @@ RIind <-
 # clean predictions
 predSum <- 
   totalPred %>% 
-  dplyr::select(-X1) %>% 
+  #dplyr::select(-X1) %>% 
   dplyr::rename(pred = '.') %>% 
   group_by(ISO3) %>% 
   summarise(predPres = mean(pred),
@@ -317,169 +328,376 @@ predSum <-
   dplyr::arrange(desc(probExt))
 
 
-# make all partial dependence plots ---------------------------------------------
+#--------------------------------------------------------------------------------------------------
+# run the BRT for shelf area instead of coastline leght -------------------------------------------
+#--------------------------------------------------------------------------------------------------
+rawSpp_shelf <- read_csv('../../../Datasets/ProcessedCovariates_200824.csv')
+
+rawDD_shelf <- read_csv('../../../Datasets/ProcessedDataDeficients_200824.csv')
+
+# regression tree analysis ---------------------------------
+
+# shallow is coastlength
+sppData_shallow <-
+  rawSpp_shelf %>%
+  # remove collinear covariates
+  dplyr::select(-X1, -ISO3, -logFishProd, -logIuu,
+                -logChondLand, -EPI, -ReefFishers, -logFinUSD) %>%
+  # remove what the reviewers what
+  dplyr::select(-OHI, -NBI, -logCoastLength,
+                -logShelfAreaDeep, -logShelfAreaShallow) %>% 
+  as.data.frame()
 
 
-total <- list()
-bootend <- 1000
-progbar <- txtProgressBar(min = 0, max = bootend, style = 3)
+sppData_deep <-
+  rawSpp_shelf %>%
+  # remove collinear covariates
+  dplyr::select(-X1, -ISO3, -logFishProd, -logIuu,
+                -logChondLand, -EPI, -ReefFishers, -logFinUSD) %>%
+  # remove what the reviewers what
+  dplyr::select(-OHI, -NBI, -logCoastLength,
+                -logShelfAreaShallow, -logCoastLengthNew) %>% 
+  as.data.frame()
 
-pdpdf <- lapply(seq(1:bootend), function(x) {
+# clean data-deficient data ---------------------------
+
+preddata_shallow <- 
+  rawDD_shelf %>% 
+  dplyr::select(-X1, -ISO3,
+                -logShelfAreaDeep) %>% 
+  as.data.frame()
+
+preddata_deep <- 
+  rawDD_shelf %>% 
+  dplyr::select(-X1, -ISO3,
+                -logShelfAreaShallow) %>% 
+  as.data.frame()
+
+
+# need to randomize the data ---------------------------
+set.seed(123)
+
+randomIndex <- sample(1:nrow(sppData), nrow(sppData))
+sppData_shallow <- sppData_shallow[randomIndex, ]
+sppData_deep <- sppData_deep[randomIndex, ]
+
+# separate the data into training set (80%) and test set (20%) ------------------
+n <- nrow(sppData)
+ntrain <- round(0.8*n)
+trainIndex <- sample(1:n, ntrain)
+
+# shallow
+sppTrain_shallow <- sppData_shallow[trainIndex, ]
+sppTest_shallow <- sppData_shallow[-trainIndex, ]
+
+# deep
+sppTrain_deep <- sppData_deep[trainIndex, ]
+sppTest_deep <- sppData_deep[-trainIndex, ]
+
+# evaluate model performance and obtain performance values -----------------
+
+# shallow first
+# make a df to infill with model eval values
+cvresults_shallow <- expand.grid(run = seq(1:100),
+                         cvauc = 0,
+                         cvdev = 0,
+                         cvcorr = 0,
+                         intnull = 0,
+                         intdev = 0,
+                         residual_deviance = 0,
+                         dev_exp = 0,
+                         evresdev = 0,
+                         evnulldev = 0,
+                         evdev = 0,
+                         evauc = 0)
+
+# make empty list to infill with relative influence values
+RIresults_shallow <- list()
+
+# make empty dataframe to infill with predictions of the test set values
+Predresults_shallow <- list()
+
+# run this with coastline length (and no shelf area)
+for(i in 1:100) {
   
-  for(i in names(sppTrain)[2:23]) {
+  # randomize the data everytime
+  randomI <- sample(1:nrow(sppTrain_shallow), nrow(sppTrain_shallow))
+  randomSpp <- sppTrain_shallow[randomI, ]
+  
+  # run cv gbm
+  cvgbm <- gbm.step(data = randomSpp,
+                    gbm.x = 2:19,
+                    gbm.y = 1,
+                    family = 'bernoulli',
+                    tree.complexity = 10,
+                    learning.rate = 0.001,
+                    bag.fraction = 0.5,
+                    n.folds = 10)
+  
+  # extract model outputs
+  cvresults_shallow$cvauc[i] <- cvgbm$cv.statistics$discrimination.mean
+  cvresults_shallow$cvdev[i] <- cvgbm$cv.statistics$deviance.mean 
+  cvresults_shallow$cvcorr[i] <- cvgbm$cv.statistics$correlation.mean
+  cvresults_shallow$intnull[i] <- cvgbm$self.statistics$mean.null
+  cvresults_shallow$intdev[i] <- 
+    (cvresults_shallow$intnull - cvresults_shallow$cvdev)/cvresults_shallow$intnull
+  cvresults_shallow$residual_deviance[i] <-  cvgbm$self.statistics$mean.resid
+  cvresults_shallow$dev_exp[i] <- 
+    (cvresults_shallow$intnull - cvresults_shallow$residual_deviance)/cvresults_shallow$intnull
+  
+  # model external metrics
+  pred <- predict.gbm(object = cvgbm, 
+                      newdata = sppTest_shallow,
+                      n.trees = cvgbm$gbm.call$best.trees,
+                      type = 'response')
+  
+  cvresults_shallow$evauc[i] <- gbm.roc.area(sppTest_shallow$occurrence, pred)
+  cvresults_shallow$evresdev[i] <- calc.deviance(sppTest_shallow$occurrence, pred, calc.mean = TRUE)
+  cvresults_shallow$evnulldev[i] <- calc.deviance(sppTest_shallow$occurrence, 
+                                          rep(mean(sppTest_shallow$occurrence),
+                                              nrow(sppTest_shallow)),
+                                          calc.mean = TRUE)
+  cvresults_shallow$evdev[i] <- 
+    (cvresults_shallow$evnulldev - cvresults_shallow$evresdev)/cvresults_shallow$evnulldev 
+  
+  # relative influence results
+  relinf <- cvgbm$contributions
+  relinf$run <- i
+  
+  RIresults_shallow[[i]] <- relinf
+  
+  # make predictions on data-deficient values
+  pred <- 
+    predict(object = cvgbm,
+            newdata = preddata_shallow,
+            n.trees = cvgbm$n.trees,
+            type = 'response') %>% 
+    as.data.frame()
+  
+  pred$ISO3 <- rawDD$ISO3
+  pred$run <- i
+  
+  Predresults_shallow[[i]] <- pred
+  
+  if (i%%2 == 0) {
     
-    randomI <- sample(1:nrow(sppTrain), nrow(sppTrain))
-    randomtest <- sppTrain[randomI, ]
-    
-    # train a gbm model
-    pdpgbm <- gbm(formula = occurrence ~ .,
-                   distribution = 'bernoulli',
-                   data = randomtest,
-                   n.trees = 3000,
-                   interaction.depth = 10,
-                   shrinkage = 0.001,
-                   bag.fraction = 0.5,
-                   cv.folds = 10,
-                   n.cores = NULL,
-                   verbose = FALSE)
-    
-    # create dataframes of pdp values predicted by gbm
-    df <- 
-      pdpgbm %>% 
-      pdp::partial(pred.var = paste(i),
-                   grid.resolution = 102,
-                   n.trees = pdpgbm$n.trees,
-                   prob = TRUE)
-    
-    df$run <- x
-    total[[i]] <- df
-    
-    setTxtProgressBar(progbar, x)
+    print(paste('Bootstrap ', i, ' done at ', Sys.time(), sep = ''))
     
   }
-  return(total)
-})
-
-# write a loop to rbind each dataframe together
-
-totaldf <- data.frame()
-alldf <- 
-  lapply(seq(1:22), function(x) {
-    for(i in 1:1000) {
-      
-      singledf <- data.frame(pdpdf[[i]][[x]])
-      totaldf <- rbind(totaldf, singledf)
   
-    }
-    return(totaldf)
-  })
+}
+beepr::beep(sound = 8)
+
+write.csv(cvresults_shallow,
+          '../../../Datasets/GBM Out/BRTBootstrapResultsCoastline_200825.csv')
+#cvresults <- read_csv('../../../Datasets/GBM Out/200630/BRTBootstrapResultsShelfAreaShallow_200630.csv')
+
+cvsummary_coast <- 
+  cvresults_shallow %>% 
+  mutate(cvr2 = cvcorr^2) %>% 
+  summarise_all(~median(.))
 
 
-# turn each df into its own csv for saving
+totalRI_shallow <- data.frame()
+totalPred_shallow <- data.frame()
 
-cols <- names(sppTrain)
-vars <- cols[2:23]
-dfvars <- paste0('GBMResults', vars, '_181211', sep = '')
-spreaddf <- list()
-
-for(i in 1:22) {
+for(i in 1:100) {
   
-  spreaddf[[i]] <- 
-    alldf[[i]] %>% 
-    mutate(id = rep(1:102, length.out = n())) %>% 
-    mutate(refid = paste(.[[1]], id, sep = '_')) %>% 
-    group_by(refid) %>% 
-    summarise(totalmean = mean(yhat),
-              totalsd = sd(yhat),
-              totaln = n(),
-              totalse = totalsd/sqrt(totaln),
-              totalmax = max(yhat),
-              totalmin = min(yhat),
-              lowerci = totalmean - qt(1 - (0.1/2), totaln - 1) * totalse,
-              upperci = totalmean + qt(1 - (0.1/2), totaln - 1) * totalse) %>% 
-    separate(refid, into = c(paste(vars[i]), 'id'), sep = '_') 
+  # bind all relative influences
+  ridf <- RIresults_shallow[[i]]
+  totalRI_shallow <- rbind(totalRI_shallow, ridf)
   
-  write.csv(spreaddf[[i]], paste0(dfvars[i], '.csv'))
-
+  # bind all predictions 
+  preddf <- Predresults_shallow[[i]]
+  totalPred_shallow <- rbind(totalPred_shallow, preddf)
+  
 }
 
+write.csv(totalPred_shallow, '../../../Datasets/GBM Out/200630/GBMPredictedShelfAreaShallow_200630.csv')
+#totalPred <- read_csv('../../../Datasets/GBM Out/200630/GBMPredictedShelfAreaShallow_200630.csv')
 
-#as.data.frame(matrix(alldf[[1]][, 2], nrow = 102, ncol = 1000)) loses the first col
-testdf <- 
-  alldf[[13]][1:306, ]
+write.csv(totalRI_shallow, '../../../Datasets/GBM Out/200630/GBMRelativeInfShelfAreaShallow_200630.csv')
+#totalRI <- read_csv('../../../Datasets/GBM Out/200630/GBMRelativeInfShelfAreaShallow_200630.csv')
 
-testdf3 <- 
-  testdf %>% 
-  mutate(id = rep(1:102, length.out = n())) %>% 
-  mutate(refid = paste(.[[1]], id, sep = '_')) %>% 
-  group_by(refid) %>%
-  summarise(totalmean = mean(yhat),
-            totalsd = sd(yhat),
-            totaln = n(),
-            totalse = totalsd/sqrt(totaln),
-            totalmax = max(yhat),
-            totalmin = min(yhat),
-            lowerci = totalmean - qt(1 - (0.1/2), totaln - 1) * totalse,
-            upperci = totalmean + qt(1 - (0.1/2), totaln - 1) * totalse) %>% 
-  separate(refid, into = c('logCoastLength', 'id'), sep = '_') %>% 
-  mutate(logCoastLength = as.numeric(logCoastLength))
+# calculate RI for each variable 
+RIsum_shallow  <- 
+  totalRI_shallow %>% 
+  group_by(var) %>% 
+  summarise(meanRI = mean(rel.inf),
+            maxRI = max(rel.inf),
+            minRI = min(rel.inf),
+            sdRI = sd(rel.inf)) %>% 
+  arrange(desc(meanRI))
 
-testplot <- 
-  ggplot(testdf3, aes(x = logCoastLength, y = totalmean, group = 1)) +
-  geom_ribbon(aes(ymin = totalmin, ymax = totalmax),
-              alpha = 0.6, fill = 'steelblue4') +
-  geom_line() +
-  theme_classic()
-
-print(testplot)
-
-
-# Check the predictive accuracy of model with Cohen's Kappa -----------------------------------
-
-# load and clean predictions dataset
-pred_raw <- read_csv('../../../Datasets/BRTBootstrapResults_190208.csv')
-
-pred <- 
-  pred_raw %>% 
-  dplyr::select(-X1) %>% 
-  dplyr::rename('predicted_value' = '.')  
-
-head(pred)
-
-# load and clean actual values
-
-# need to calculate predictive accuracy using Cohen's kappa for different value cut-offs
+# clean predictions
+predSum_shallow  <- 
+  totalPred_shallow  %>% 
+  #dplyr::select(-X1) %>% 
+  dplyr::rename(pred = '.') %>% 
+  group_by(ISO3) %>% 
+  summarise(predPres = mean(pred),
+            predPresmin = min(pred),
+            predPresmax = max(pred)) %>% 
+  mutate(ISO3 = countrycode(ISO3, 'iso3c', 'country.name')) %>% 
+  mutate(probExt = (1 - predPres) * 100,
+         probExtmin = (1 - predPresmax) * 100,
+         probExtmax = (1 - predPresmin) * 100) %>% 
+  dplyr::select(ISO3, probExt, probExtmin, probExtmax) %>%
+  dplyr::arrange(desc(probExt))
 
 
 
+# deep ---------------------------------------------------------------------
+sppTrain_deep <- sppData_deep[trainIndex, ]
+sppTest_deep <- sppData_deep[-trainIndex, ]
+
+# evaluate model performance and obtain performance values -----------------
+
+# shallow first
+# make a df to infill with model eval values
+cvresults_deep <- expand.grid(run = seq(1:100),
+                                 cvauc = 0,
+                                 cvdev = 0,
+                                 cvcorr = 0,
+                                 intnull = 0,
+                                 intdev = 0,
+                              residual_deviance = 0,
+                              dev_exp = 0,
+                                 evresdev = 0,
+                                 evnulldev = 0,
+                                 evdev = 0,
+                                 evauc = 0)
+
+# make empty list to infill with relative influence values
+RIresults_deep <- list()
+
+# make empty dataframe to infill with predictions of the test set values
+Predresults_deep <- list()
+
+# run this with coastline length (and no shelf area)
+for(i in 1:100) {
+  
+  # randomize the data everytime
+  randomI <- sample(1:nrow(sppTrain_deep), nrow(sppTrain_deep))
+  randomSpp <- sppTrain_deep[randomI, ]
+  
+  # run cv gbm
+  cvgbm <- gbm.step(data = randomSpp,
+                    gbm.x = 2:19,
+                    gbm.y = 1,
+                    family = 'bernoulli',
+                    tree.complexity = 10,
+                    learning.rate = 0.001,
+                    bag.fraction = 0.5,
+                    n.folds = 10)
+  
+  # extract model outputs
+  cvresults_deep$cvauc[i] <- cvgbm$cv.statistics$discrimination.mean
+  cvresults_deep$cvdev[i] <- cvgbm$cv.statistics$deviance.mean 
+  cvresults_deep$cvcorr[i] <- cvgbm$cv.statistics$correlation.mean
+  cvresults_deep$intnull[i] <- cvgbm$self.statistics$mean.null
+  cvresults_deep$intdev[i] <- 
+    (cvresults_deep$intnull - cvresults_deep$cvdev)/cvresults_deep$intnull
+  cvresults_deep$residual_deviance[i] <-  cvgbm$self.statistics$mean.resid
+  cvresults_deep$dev_exp[i] <- 
+    (cvresults_deep$intnull - cvresults_deep$residual_deviance)/cvresults_deep$intnull
+  
+  # model external metrics
+  pred <- predict.gbm(object = cvgbm, 
+                      newdata = sppTest_deep,
+                      n.trees = cvgbm$gbm.call$best.trees,
+                      type = 'response')
+  
+  cvresults_deep$evauc[i] <- gbm.roc.area(sppTest_deep$occurrence, pred)
+  cvresults_deep$evresdev[i] <- calc.deviance(sppTest_deep$occurrence, pred, calc.mean = TRUE)
+  cvresults_deep$evnulldev[i] <- calc.deviance(sppTest_deep$occurrence, 
+                                                  rep(mean(sppTest_deep$occurrence),
+                                                      nrow(sppTest_deep)),
+                                                  calc.mean = TRUE)
+  cvresults_deep$evdev[i] <- 
+    (cvresults_deep$evnulldev - cvresults_deep$evresdev)/cvresults_deep$evnulldev 
+  
+  # relative influence results
+  relinf <- cvgbm$contributions
+  relinf$run <- i
+  
+  RIresults_deep[[i]] <- relinf
+  
+  # make predictions on data-deficient values
+  pred <- 
+    predict(object = cvgbm,
+            newdata = preddata_deep,
+            n.trees = cvgbm$n.trees,
+            type = 'response') %>% 
+    as.data.frame()
+  
+  pred$ISO3 <- rawDD$ISO3
+  pred$run <- i
+  
+  Predresults_deep[[i]] <- pred
+  
+  if (i%%2 == 0) {
+    
+    print(paste('Bootstrap ', i, ' done at ', Sys.time(), sep = ''))
+    
+  }
+  
+}
+beepr::beep(sound = 8)
+
+write.csv(cvresults_deep,
+          '../../../Datasets/GBM Out/BRTBootstrapResultsShelfAreaDeep_200825.csv')
+#cvresults <- read_csv('../../../Datasets/GBM Out/200630/BRTBootstrapResultsShelfAreaDeep_200630.csv')
+
+cvsummary_deep <- 
+  cvresults_deep%>% 
+  mutate(cvr2 = cvcorr^2) %>% 
+  summarise_all(~median(.))
 
 
+totalRI_deep <- data.frame()
+totalPred_deep <- data.frame()
 
+for(i in 1:100) {
+  
+  # bind all relative influences
+  ridf <- RIresults_deep[[i]]
+  totalRI_deep <- rbind(totalRI_deep, ridf)
+  
+  # bind all predictions 
+  preddf <- Predresults_deep[[i]]
+  totalPred_deep <- rbind(totalPred_deep, preddf)
+  
+}
 
+write.csv(totalPred_deep, '../../../Datasets/GBM Out/200630/GBMPredictedShelfAreaDeep_200630.csv')
+#totalPred <- read_csv('../../../Datasets/GBM Out/200630/GBMPredictedShelfAreaShallow_200630.csv')
 
+write.csv(totalRI_deep, '../../../Datasets/GBM Out/200630/GBMRelativeInfShelfAreaDeep_200630.csv')
+#totalRI <- read_csv('../../../Datasets/GBM Out/200630/GBMRelativeInfShelfAreaShallow_200630.csv')
 
+# calculate RI for each variable 
+RIsum_deep  <- 
+  totalRI_deep %>% 
+  group_by(var) %>% 
+  summarise(meanRI = mean(rel.inf),
+            maxRI = max(rel.inf),
+            minRI = min(rel.inf),
+            sdRI = sd(rel.inf)) %>% 
+  arrange(desc(meanRI))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# clean predictions
+predSum_deep  <- 
+  totalPred_deep  %>% 
+  #dplyr::select(-X1) %>% 
+  dplyr::rename(pred = '.') %>% 
+  group_by(ISO3) %>% 
+  summarise(predPres = mean(pred),
+            predPresmin = min(pred),
+            predPresmax = max(pred)) %>% 
+  mutate(ISO3 = countrycode(ISO3, 'iso3c', 'country.name')) %>% 
+  mutate(probExt = (1 - predPres) * 100,
+         probExtmin = (1 - predPresmax) * 100,
+         probExtmax = (1 - predPresmin) * 100) %>% 
+  dplyr::select(ISO3, probExt, probExtmin, probExtmax) %>%
+  dplyr::arrange(desc(probExt))

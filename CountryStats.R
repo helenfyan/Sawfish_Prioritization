@@ -39,18 +39,17 @@ hist <-
   summarise(hist_spp = sum(nosppHist))
 
 # make a column for predictions 
-pred_raw <- read_csv('../../../Datasets/GBMPredictedMeans_190122.csv') %>% 
+pred_raw <- read_csv('../../../Datasets/GBMPredictedMeans_200722.csv') %>% 
   dplyr::select(-X1)
 
 pred <- 
   pred_raw %>% 
   mutate(action = case_when(ISO3 == 'YEM' ~ 'middle',
-                            value > 0.75 ~ 'protect',
-                            value <= 0.25 ~ 'extinct',
+                            mean_pred > 0.75 ~ 'protect',
+                            mean_pred <= 0.25 ~ 'extinct',
                             TRUE ~ as.character('middle'))) %>% 
   dplyr::filter(action != 'middle') %>% 
-  dplyr::filter(action == 'protect') %>% 
-  dplyr::select(-value)
+  dplyr::filter(action == 'protect')
 
 head(pred)
 
@@ -220,7 +219,7 @@ write.csv(ddMap, 'Publication Maps/SpeciesDataDeficients_190227.csv')
 # Predictions ---------------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------
 
-predsraw <- read_csv('../../../Datasets/GBMPredictedMeans_190122.csv')
+predsraw <- read_csv('../../../Datasets/GBMPredictedMedians_200825.csv')
 
 preds <- 
   predsraw %>% 
@@ -266,6 +265,13 @@ write.csv(predsRange, 'GBMPredictedRange_190305.csv')
 # ---------------------------------------------------------------------------------------------------
 # Predictions combined with known presence -------------------------------------------
 # ---------------------------------------------------------------------------------------------------
+newpred <- 
+  predsraw %>% 
+  dplyr::select(ISO3, median_pred) %>% 
+  rename('value' = 'median_pred') %>% 
+  mutate(value = value/100,
+         value = 1 - value)
+
 
 knownPred <- 
   allsppraw %>% 
@@ -277,12 +283,12 @@ knownPred <-
   dplyr::filter(presence != 'unknown') %>% 
   mutate(value = case_when(presence == 'present' ~ 1,
                                 presence == 'absent' ~ 0)) %>% 
-  select(-country, -region, -species, -presence) %>% 
+  dplyr::select(-country, -region, -species, -presence) %>% 
   arrange(desc(value)) %>% 
   distinct(ISO3, .keep_all = TRUE) %>% 
-  mutate(X1 = 0) %>% 
-  rbind(predsraw) %>% 
-  select(-X1) %>% 
+  #mutate(X1 = 0) %>% 
+  rbind(newpred) %>% 
+  #select(-X1) %>% 
   arrange(value) %>% 
   distinct(ISO3, .keep_all = TRUE)
 
@@ -290,4 +296,52 @@ head(knownPred)
 lapply(knownPred, function(x) sum(is.na(x)))
 View(knownPred)
 
-write_csv(knownPred, '../../../Datasets/Publication Maps/PredictionsWKnown_190510.csv')
+write_csv(knownPred, '../../../Datasets/Publication Maps/PredictionsWKnown_200825.csv')
+
+
+# ---------------------------------------------------------------------------------------------------
+# Model results from cv BRTs ------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------
+setwd('../../../ModelOutputs/GBM')
+
+cv_files <- list.files(pattern = '200814_CvResults_*')
+cv_dfs <- lapply(cv_files, read_csv)
+
+cv_all <- 
+  do.call(rbind, cv_dfs) %>% 
+  summarise_all(list(~min(.), ~median(.), ~max(.)))
+
+
+head(cv_all)
+nrow(cv_all)
+View(cv_all)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

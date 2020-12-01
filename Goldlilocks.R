@@ -18,39 +18,70 @@ publication_theme <- function(axis_text_size = 13) {
         legend.title.align = 0.5)
 }
 
-rawSpp <- read_csv('../../../Datasets/ProcessedCovariates_190119.csv')
-rawDD <- read_csv('../../../Datasets/ProcessedDataDeficients_190208.csv')
+rawSpp <- read_csv('../../../Datasets/ProcessedCovariates_200824.csv')
+rawDD <- read_csv('../../../Datasets/ProcessedDataDeficients_200824.csv')
 
 # show where the countries that are predicted with Pext for DD
 # Make fishing 0 in DD countries and see how this shakes out
 
-sppTrain <- read_csv('../../../Datasets/GBMtrain_190119.csv')
+# regression tree analysis ---------------------------------
 
-sppTrain <- 
-  sppTrain %>% 
-  dplyr::select(-X1, -logFinUSD) %>% 
-  # need to reorder for analysis
-  .[, c(6, 1:5, 7:20)] %>% 
+sppData <-
+  rawSpp %>%
+  # remove collinear covariates
+  dplyr::select(-X1, -logFishProd, -logIuu,
+                -logChondLand, -EPI, -ReefFishers, -logFinUSD,
+                -logShelfAreaDeep, -logCoastLength, -logCoastLengthNew,
+                -NBI, -OHI) %>%
+  as.data.frame() 
+
+# clean data-deficient data ---------------------------
+
+preddata <- 
+  rawDD %>% 
+  dplyr::select(-X1,-logShelfAreaDeep, -logCoastLength, -logCoastLengthNew,
+                -NBI, -OHI) %>% 
   as.data.frame()
 
-sppTest <- read_csv('../../../Datasets/GBMtest_190119.csv')
+
+# need to randomize the data ---------------------------
+set.seed(123)
+
+randomIndex <- sample(1:nrow(sppData), nrow(sppData))
+sppData <- sppData[randomIndex, ]
+
+# separate the data into training set (80%) and test set (20%) ------------------
+n <- nrow(sppData)
+ntrain <- round(0.8*n)
+trainIndex <- sample(1:n, ntrain)
+
+sppTrain_raw <- sppData[trainIndex, ]
+sppTest_raw <- sppData[-trainIndex, ]
+
+sppTrain <- 
+  sppTrain_raw %>% 
+  # need to reorder for analysis
+  #.[, c(15, 1:14, 16:20)] %>% 
+  dplyr::select(-ISO3) %>% 
+  #mutate_at(c(8:21), list(~ scale(.))) %>% 
+  as.data.frame()
 
 sppTest <- 
-  sppTest %>% 
-  dplyr::select(-X1, -logFinUSD) %>% 
+  sppTest_raw %>% 
   # need to reorder for analysis
-  .[, c(6, 1:5, 7:20)] %>% 
+  #.[, c(1, 7, 2:6, 8:21)] %>% 
+  #mutate_at(c(8:21), list(~ scale(.))) %>% 
+  arrange(ISO3) %>% 
   as.data.frame()
 
 cvgbm <- gbm.step(data = sppTrain,
-                  gbm.x = 2:20,
+                  gbm.x = 2:19,
                   gbm.y = 1,
                   family = 'bernoulli',
                   tree.complexity = 10,
-                  learning.rate = 0.001,
+                  learning.rate = 0.005,
                   bag.fraction = 0.5,
                   n.folds = 10)
-
 
 
 # clean data-deficient data ---------------------------
@@ -84,7 +115,7 @@ sort_df <-
 
 head(sort_df)
 
-# predict for 10% increase in mangrove area
+# predict for 100% increase in mangrove area
 pred_man_df <- 
   preddata %>% 
   mutate(logMang = logMang + (1*logMang))
@@ -109,7 +140,8 @@ pred_zero_df <-
   dplyr::mutate(logProteinDiet = 0,
                 logChondCatch = 0,
                 logtotalGearTonnes = 0,
-                logCoastPop = 0)
+                #logCoastPop = 0)
+                logFishEffort = 0)
 
 head(pred_zero_df)
 
@@ -226,5 +258,5 @@ goldilocks <-
 
 goldilocks
 
-ggsave('../../../Figures/Publication/Goldilocks_200117.pdf', goldilocks,
+ggsave('../../../Figures/Publication/Goldilocks_200825.pdf', goldilocks,
        width = 30, height = 20, dpi = 600, units = c('cm'))

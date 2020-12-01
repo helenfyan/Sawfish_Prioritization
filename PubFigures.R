@@ -21,15 +21,16 @@ presentation_theme <- function(axis_text_size = 13, axis_y_ticks = element_line(
 
 library(reshape2)
 
-raw <- read_csv('../../../Datasets/ProcessedCovariates_190119.csv')
+raw <- read_csv('../../../Datasets/ProcessedCovariates_200824.csv')
 
 dat <- 
   raw %>% 
-  dplyr::select(ISO3, logtotalGearTonnes, logPprodMean, NBI,
-               logCoastPop, logCoastLength, logEstDis, logProteinDiet,
-               logGDP, HDI, OHI, logMang, WGI, logChondCatch, SstMean,
-               logFishProd, logIuu) %>% 
-  distinct(ISO3, .keep_all = TRUE) %>% 
+  dplyr::select(ISO3, logtotalGearTonnes, logPprodMean,
+               logCoastPop, logEstDis, logProteinDiet,
+               logGDP, HDI, logMang, WGI, logChondCatch, SstMean,
+               logFishProd, logIuu, logShelfAreaShallow, 
+               logShelfAreaDeep, logFishEffort, logCoastLengthNew) %>% 
+  #distinct(ISO3, .keep_all = TRUE) %>% 
   dplyr::select(-ISO3)
   
 sapply(dat, function(x) sum(is.na(x)))
@@ -71,16 +72,19 @@ corfig <-
                               'HDI' = 'Human Development Index (HDI)',
                               #'EPI' = 'Environmental Performance Index (EPI)',
                               'WGI' = 'World Governance Index (WGI)',
-                              'OHI' = 'Ocean Health Index (OHI)',
-                              'NBI' = 'National Biodiversity Index (NBI)',
+                              #'OHI' = 'Ocean Health Index (OHI)',
+                              #'NBI' = 'National Biodiversity Index (NBI)',
                               'logIuu' = 'Illegal unreported and unregulated fishing (IUU)',
                               'logGDP' = 'Gross Domestic Product (GDP)',
-                              'logCoastLength' = 'Coastline length (CLL)',
+                              'logCoastLengthNew' = 'Coastline length (CLL)',
                               'logProteinDiet' = 'Marine protein consumption (MPC)',
-                              'logtotalGearTonnes' = 'Gear-restricted landings (GLT)',
+                              'logtotalGearTonnes' = 'Gear-specific landings (GSL)',
                               #'ReefFishers' = 'Reef Fishers (RFF)',
                               'logFishProd' = 'Marine fisheries production (MFP)',
-                              'logChondCatch' = 'Chondrichthyan landings (CHL)')) %>%
+                              'logChondCatch' = 'Chondrichthyan landings (CHL)',
+                              'logShelfAreaShallow' = 'Shelf area (shallow; SHA)',
+                              'logShelfAreaDeep' = 'Shelf area (deep; SHD)',
+                              'logFishEffort' = 'Fishing effort (FSE)')) %>%
   mutate(Var1 = dplyr::recode(Var1, 'logEstDis' = 'EDR',
                               'logPprodMean' = 'PPD',
                               'logFinUSD' = 'FXP',
@@ -91,16 +95,19 @@ corfig <-
                               'HDI' = 'HDI',
                               #'EPI' = 'EPI',
                               'WGI' = 'WGI',
-                              'OHI' = 'OHI',
-                              'NBI' = 'NBI',
+                              #'OHI' = 'OHI',
+                              #'NBI' = 'NBI',
                               'logIuu' = 'IUU',
                               'logGDP' = 'GDP',
-                              'logCoastLength' = 'CLL',
+                              'logCoastLengthNew' = 'CLL',
                               'logProteinDiet' = 'MPC',
-                              'logtotalGearTonnes' = 'GLT',
+                              'logtotalGearTonnes' = 'GSL',
                               #'ReefFishers' = 'RFF',
                               'logFishProd' = 'MFP',
-                              'logChondCatch' = 'CHL')) %>%
+                              'logChondCatch' = 'CHL',
+                              'logShelfAreaShallow' = 'SHA',
+                              'logShelfAreaDeep' = 'SHD',
+                              'logFishEffort' = 'FSE')) %>%
   # reverse the order of x to get plot aligned with axes
   mutate(Var1 = as.factor(Var1)) %>%
   mutate(Var1 = factor(Var1, levels = rev(levels(Var1)))) %>%
@@ -110,7 +117,14 @@ corfig <-
                       midpoint = 0, limit = c(-1, 1), space = 'Lab') +
                       #name = 'Pearson\nCorrelation') +
   coord_fixed() +
-  geom_text(aes(x = Var1, y = Var2, label = value), colour = 'black', size = 3) +
+  geom_text(aes(x = Var1, y = Var2, label = value,
+                # bold certain values
+                fontface = ifelse(value %in% c(0.86, 0.83, 0.95, 
+                                               0.89, 0.88, 0.87), 2, 1),
+                size = ifelse(value %in% c(0.86, 0.83, 0.95, 
+                                           0.89, 0.88, 0.87), 2, 1)),
+            colour = 'black') +
+  scale_size(range = c(3, 3.75), guide = FALSE) +
   theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                    size = 12, hjust = 1),
         legend.position = 'none') +
@@ -124,50 +138,77 @@ corfig <-
        x = ' ') +
   presentation_theme()
 
-print(corfig)
+corfig
 
-ggsave('../../../Figures/Publication/CorHeatMap_200207.pdf', corfig,
+ggsave('../../../Figures/Publication/CorHeatMap_200910.pdf', corfig,
        height = 20, width = 30, units = c('cm'))
 
 #  -----------------------------------------------------------------
 #  Partial dependence plots ----------------------------------------
 #  -----------------------------------------------------------------
-
-setwd('../../../datasets/GBM out')
-
-figs <- list.files(pattern = '*_190201.csv')
-dfs <- lapply(figs, read.csv)
-
-for(i in 1:20) {
-  
-  #pdf(paste('../Figures/2GBMout', i, '_181212.pdf', sep = ''))
-  
-  pdpplot <- 
-    ggplot(dfs[[i]], aes_string(x = colnames(dfs[[i]][2]), y = colnames(dfs[[i]][3]), 
-                                group = 1)) +
-    geom_ribbon(aes(ymin = totmin, ymax = totmax),
-                alpha = 0.6, fill = 'steelblue4') +
-    geom_line(size = 1) +
-    #scale_y_continuous(limits = c(0.1, 0.7)) +
-    geom_rug(sides = 'b') +
-    labs(y = 'Partial Response on Occurrence') +
-    presentation_theme()
-  
-  print(pdpplot)
-  
-  #dev.off()
-  
-}
-
-#  -----------------------------------------------------------------
-#  Multipanel plots ------------------------------------------------
-#  -----------------------------------------------------------------
-
 # Match Trevor Branch's figures with standardized axes -------------
 library(facetscales)
 library(gridExtra)
 library(grid)
+library(patchwork)
 
+setwd('../../../ModelOutputs/GBM/PDP')
+
+pdp_files <- list.files(pattern = '200824_PDP_*')
+pdp_dfs <- lapply(pdp_files, read_csv)
+
+all_pdp <- 
+  do.call(rbind, pdp_dfs) %>% 
+  dplyr::select(-X1) %>% 
+  group_by(variable, independent_value) %>% 
+  summarise(total_med = median(pdp_value),
+            total_max = max(pdp_value),
+            total_min = min(pdp_value)) %>% 
+  # need to scale all the independent variables
+  ungroup() %>% 
+  group_by(variable) %>% 
+  mutate(independent_value = scale(independent_value)) %>% 
+  ungroup() %>% 
+  mutate(variable = factor(variable, levels = c('logShelfAreaShallow',
+                                                'logtotalGearTonnes',
+                                                'logProteinDiet',
+                                                'logMang',
+                                                'WGI',
+                                                'logGDP',
+                                                'HDI',
+                                                'logEstDis',
+                                                'logChondCatch',
+                                                'logCoastPop',
+                                                'logFishEffort',
+                                                'logPprodMean',
+                                                'SstMean',
+                                                'speciessmall',
+                                                'speciesgreen',
+                                                'specieslarge',
+                                                'speciesnarrow',
+                                                'speciesdwarf'))) %>% 
+  mutate(index = case_when(variable == 'logProteinDiet' ~ 'fish',
+                           variable == 'logtotalGearTonnes' ~ 'fish',
+                           variable == 'logChondCatch' ~ 'fish',
+                           variable == 'logFishEffort' ~ 'fish',
+                           variable == 'logCoastPop' ~ 'fish',
+                           #variable == 'HDI' ~ 'manage',
+                           #variable == 'logGDP' ~ 'manage',
+                           #variable == 'WGI' ~ 'manage',
+                           variable == 'logShelfAreaShallow' ~ 'eco',
+                           variable == 'logMang' ~ 'eco',
+                           variable == 'logEstDis' ~ 'eco',
+                           variable == 'logPprodMean' ~ 'eco',
+                           variable == 'SstMean' ~ 'eco',
+                           TRUE ~ 'other')) %>% 
+  mutate(scale_limit = total_med + 0.2)
+  
+  
+
+head(all_pdp)
+unique(all_pdp$variable)
+
+# create a theme for pdp plots
 pdp_theme <- 
   function(axis_text_size = 13, axis_y_ticks = element_line()) {
   theme(panel.grid = element_blank(),
@@ -184,7 +225,59 @@ pdp_theme <-
         panel.spacing = unit(0, 'lines'),
         panel.border = element_rect(colour = 'grey60', 
                                     size = 1, fill = NA))
+  }
+
+
+# create a plotting function
+pdp_plot <- function(index_name, ribbon_colour) {
+  
+  the_plot <- 
+    all_pdp %>% 
+    dplyr::filter(index == index_name) %>% 
+    ggplot(aes(x = independent_value, y = total_med)) +
+    # kind of dodge but increase the maximum value to make space for the label later
+    geom_ribbon(aes(ymin = total_min, ymax = scale_limit), fill = 'white', alpha = 0) +
+    geom_ribbon(aes(ymin = total_min, ymax = total_max), fill = ribbon_colour, alpha = 0.8) +
+    geom_line(size = 1) +
+    facet_grid(rows = vars(variable), space = 'free_y', scales = 'free_y') +
+    #facetscales::facet_grid_sc(rows = vars(variable), space = 'free_y', 
+    #              scales = 'free_y') +
+    pdp_theme()
+  
+  return(the_plot)
+  
 }
+
+eco <- pdp_plot('eco', '#1d91c0') +
+  labs(y = 'Marginal effect on sawfish occurrence',
+       x = '') 
+
+fish <- pdp_plot('fish', '#d7301f') +
+  labs(y = '',
+       x = 'Standardized value of explanatory variable')
+
+man <- pdp_plot('other', '#984ea3') +
+  labs(y = '', x = '')
+
+full_pdp <- 
+  eco + fish + man + plot_layout(ncol = 3)
+
+full_pdp
+
+ggsave('../../../Figures/Publication/UnlabelledPDPstd_200825.pdf', full_pdp,
+       height = 20, width = 30, units = c('cm'))
+
+ggplot(finalfish_f, aes(x = stdvalue, y = totmean)) +
+  geom_ribbon(aes(ymin = totmin, ymax = totmax), fill = '#d7301f',
+              alpha = 0.6) +
+  geom_line(size = 1) +
+  #facet_grid(variable ~ ., space = 'free_y', scale = 'free_y') + 
+  facet_grid_sc(rows = vars(variable), space = 'free_y', 
+                scales = list(y = fishscales)) +
+  pdp_theme() +
+  labs(y = '', x = '') +
+  theme(plot.margin = unit(c(0.1, 0.1, -0.5, -0.05), 'cm')) 
+#geom_text(data = fishtitle, mapping = aes(x = x, y = y, label = label), size = 5)
 
 # try for pressures -----------------------
 diet <- dfs[[9]]
@@ -587,9 +680,10 @@ library(remotes)
 library(sf)
 library(fishualize)
 
-searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_200207.csv')
+searchRaw <- read_csv('../../../Datasets/SawfishSearchMethods_200720.csv')
 searchCoord <- 
-  read_csv('../../../Datasets/SawfishSearchCountriesComplete_200115.csv')
+  read_csv('../../../Datasets/SawfishSearchCountriesComplete_200115.csv') %>% 
+  mutate(country = tolower(country))
 
 # want long style where twe have a study type in the country - size of the dot
 # corresponding to the number of studies done in the area
@@ -602,16 +696,36 @@ searchClean <-
   # gather the different survey types
   gather(key = key, value = method, method1:method4) %>% 
   # gather the different countries now
-  gather(key = key, value = country, country1:country25) %>% 
-  mutate(country = dplyr::recode(country, 'coasta rica' = 'costa rica')) %>% 
+  gather(key = key, value = country_1, country1:country25) %>% 
+  mutate(country_1 = dplyr::recode(country_1, 'coasta rica' = 'costa rica')) %>% 
   dplyr::select(-key) %>% 
-  dplyr::select(-X39, -X40, -X41) %>% 
-  drop_na() %>% 
+  dplyr::select(-X40, -X41, -X42, -X43) %>% 
   mutate(method = gsub(' ', '_', method)) %>% 
-  # filter out eDNA and direct survey
-  #dplyr::filter(!method %in% c('direct_survey', 'eDNA')) %>% 
-  # remove eDNA
-  #dplyr::filter(method != 'eDNA') %>% 
+  # filter out those labelled as REMOVE
+  dplyr::filter(ms_method != 'REMOVE') %>% 
+  # rename LEK to Local ecological knowledge surveys
+  mutate(ms_method = dplyr::recode(ms_method,
+                                   'LEK' = 'Local ecological knowledge survey')) %>% 
+  # remove old method column
+  dplyr::select(-method) %>% 
+  # clean the country names
+  mutate(country_1 = tolower(country_1),
+         country_1 = dplyr::recode(country_1,
+                                 'guine bissau' = 'guinea bissau',
+                                 'guinea-bissau' = 'guinea bissau')) %>% 
+  drop_na() %>% 
+  group_by(country_1, ms_method) %>% 
+  summarise(total = n()) %>% 
+  left_join(searchCoord, by = c('country_1' = 'country')) %>% 
+  mutate(ms_method = factor(ms_method, levels = c('Historical ecology',
+                                               'Ecological research',
+                                               'Local ecological knowledge survey',
+                                               'Distribution mapping',
+                                               'Fisheries',
+                                               'Taxonomy')))
+  
+  
+  
   mutate(method = recode(method,
                          'fisheries' = 'Bather protection nets & fisheries',
                          'bather_net' = 'Bather protection nets & fisheries',
@@ -654,8 +768,9 @@ map_shp <-
 methodsMap <- 
   ggplot() +
   geom_sf(data = map_shp, colour = '#D4D4D4', fill = '#C8C8C8', size = 0.3) +
-  geom_point(data = searchClean, aes(x = long, y = lat, colour = method, size = total),
-             alpha = 0.5, position = position_jitter(width = 1, height = 1)) +
+  geom_point(data = searchClean, aes(x = long, y = lat, colour = ms_method, size = total),
+             alpha = 0.6, position = position_jitter(width = 1, height = 1),
+             shape = 16) +
   theme(panel.background = element_blank(),
         panel.border = element_blank(),
         axis.title = element_blank(),
@@ -667,14 +782,13 @@ methodsMap <-
   #       colour = guide_legend(override.aes = list(size = 9,
   #                                                 alpha = 0.8))) +
   labs(colour = 'Method') +
-  scale_size(range = c(6, 18)) +
-  scale_color_fish(option = 'Scarus_quoyi', direction = 1,
+  scale_size(range = c(6, 12)) +
+  scale_color_fish(option = 'Scarus_quoyi', direction = -1,
                    discrete = TRUE)
-  
 
 methodsMap
 
-ggsave('../../../Figures/Publication/Maps/MapMethods_200207.png', methodsMap, 
+ggsave('../../../Figures/Publication/Maps/MapMethods_200908.png', methodsMap, 
        height = 20, width = 30, units = c('cm'), dpi = 600)
 
 # ------------------------------------------------------------------

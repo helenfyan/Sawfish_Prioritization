@@ -5,6 +5,34 @@ setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/')
 library(tidyverse)
 library(countrycode)
 
+# Create current known presence for SOM map -----------------------------------------
+occ_raw <- read_csv('../../../Datasets/SawfishOccurrence_181015.csv')
+
+head(occ_raw)
+
+occ_clean <- 
+  occ_raw %>% 
+  dplyr::select(country, species, presence) %>% 
+  mutate(country = dplyr::recode(country,
+                                 'Domincia' = 'Dominica',
+                                 'Saint Vinctente and Grenadines' = 'Saint Vincent and Grenadines'),
+         ISO3 = countrycode(country, 'country.name', 'iso3c'),
+         ref_id = paste(ISO3, species, presence, sep = '_')) %>%
+  # remove duplicates
+  distinct(ref_id, .keep_all = TRUE) %>% 
+  dplyr::select(-ref_id) %>% 
+  #dplyr::filter(presence == 'present') %>% 
+  group_by(ISO3, presence) %>% 
+  summarise(extant = n()) %>% 
+  pivot_wider(names_from = presence, values_from = extant) %>% 
+  replace(is.na(.), 0) %>% 
+  # create a column of historical individuals
+  mutate(historical = absent + present + unknown)
+
+head(occ_clean)
+
+write_csv(occ_clean, '../../../Datasets/SawfishOccurrence_200908.csv')
+
 # Clean occurrence data -------------------------------------------------------------
 
 library(readxl)
@@ -53,7 +81,7 @@ write_csv(FormalData, 'SawfishOccurrence_181015.csv')
 
 # Combine species occurrences with ISO data ---------------------------------------------------------
 
-iso <- read_csv('CountryISO3.csv')
+iso <- read_csv('../../../Datasets/CountryISO3.csv')
 
 
 AllSpeciesISO <-
@@ -592,37 +620,6 @@ saufinal <-
 
 write.csv(saufinal, 'LDavidsonCatch_190115.csv')
 
-# Clean GBM Out Iterations --------------------------------------------------------------------
-rm(list=ls())
-
-setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/gbm out/')
-
-old <- list.files(pattern="Iter1*")
-olddf <- lapply(old, read_csv)
-
-new <- list.files(pattern = "GBMResults2*")
-newdf <- lapply(new, read_csv)
-
-dfs <- list()
-for(i in 1:20) {
-  
-  dfs[[i]] <- 
-    olddf[[i]] %>% 
-    rbind(., olddf[[i + 20]]) %>% 
-    rbind(., newdf[[i]]) %>% 
-    dplyr::select(-X1) %>% 
-    group_by_(names(.)[c(1, 2)]) %>% 
-    summarise(totmean = mean(totalmean),
-              totmax = max(totalmax),
-              totmin = min(totalmin))
-  
-  dfscols <- colnames(dfs[[i]])
-  col <- dfscols[1] 
-  
-  write.csv(dfs[[i]], paste('CleanGBMout', col, '_190201.csv', sep = ''))
-  
-}
-
 
 # SAU Sawfish landings --------------------------------------------------------------------
 setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/SAUSawfishLandings/')
@@ -679,8 +676,182 @@ searchLatLong <-
   searchClean %>% 
   mutate(lat = case_when())
 
+# Clean relative influences --------------------------------------------------------------------
+setwd('../../../ModelOutputs/GBM')
+
+ri_files <- list.files(pattern = '200824_CvGBMRelInf_')
+ri_dfs <- lapply(ri_files, read_csv)
+
+all_ri <- 
+  do.call(rbind, ri_dfs) %>% 
+  dplyr::select(-X1) %>% 
+  group_by(var) %>% 
+  summarise(median_ri = round(median(rel.inf), 2),
+            min_ri = round(min(rel.inf), 2),
+            max_ri = round(max(rel.inf), 2)) %>% 
+  arrange(-median_ri)
+
+all_ri
+View(all_ri)
+
+# Clean predicted probability of extinctions --------------------------------------------------
+setwd('../../../ModelOutputs/GBM')
+library(countrycode)
+
+pred_list_files <- list.files(pattern = '200824_CvGBMPred*')
+pred_files <- lapply(pred_list_files, read_csv)
+
+pred <- 
+  do.call(rbind, pred_files) %>% 
+  dplyr::select(-X1) %>% 
+  # remove duplicates
+  mutate(refid = paste(ISO3, Prediction, RunNo, sep = '_')) %>% 
+  distinct(refid, .keep_all = TRUE) %>% 
+  mutate(country = countrycode(ISO3, 'iso3c', 'country.name')) %>% 
+  group_by(ISO3, country) %>% 
+  summarise(median_pred = round((1 - median(Prediction)) * 100, 1),
+            min_pred = round((1 - max(Prediction)) * 100, 1),
+            max_pred = round((1 - min(Prediction)) * 100, 1)) %>% 
+  arrange(-median_pred) 
+  
+View(pred)
+head(pred)
+
+write.csv(pred, '../../Datasets/GBMPredictedMedians_200825.csv')
+
+extinct <- 
+  pred %>% 
+  filter(median_pred > 75)
+
+extinct
+
+protect <- 
+  pred %>% 
+  filter(median_pred < 25)
+
+protect
+
+# Clean model performance metrics ------------------------------------------------------------
+setwd('../../../ModelOutputs/GBM')
+
+cv_list_files <- list.files(pattern = '200824_CvResults*')
+cv_files <- lapply(cv_list_files, read_csv)
+
+model_results <- 
+  do.call(rbind, cv_files) %>% 
+  dplyr::select(dev_exp, cvauc,
+                cvcorr, evauc, evdev) %>%
+  summarise_all(list(~ mean(.),
+                     ~ median(.),
+                     ~ min(.),
+                     ~max(.)))
+
+head(model_results)
+
+# Clean total area protected with 100m bathymetry ----------------------------------------
+library(countrycode)
+
+shelf_raw <- read_csv('../../../Datasets/Sawfish_bathy_areaKM2_Coastline_200824.csv')
+spp_occ <- read_csv('../../../Datasets/ProcessedCovariates_200824.csv')
+
+head(shelf_raw)
+head(spp_occ)
+
+hist <- 
+  shelf_raw %>% 
+  distinct(ISO_Ter1, .keep_all = TRUE) %>% 
+  summarise(hist_area = sum(AllShelfAreaKM2_100mBathy))
+
+hist
+
+TZA_protect <- data.frame(ISO3 = 'TZA', occurrence = 1)
+
+protect <- 
+  spp_occ %>% 
+  dplyr::select(ISO3, occurrence) %>% 
+  rbind(TZA_protect) %>% 
+  left_join(., shelf_raw, by = c('ISO3' = 'ISO_Ter1')) %>% 
+  dplyr::select(ISO3, occurrence, AllShelfAreaKM2_100mBathy) %>% 
+  dplyr::rename('depth_100m' = 'AllShelfAreaKM2_100mBathy') %>% 
+  mutate(protection = case_when(occurrence == 1 ~ 'protect',
+                                ISO3 %in% c('LKA',
+                                            'MEX',
+                                            'BRA',
+                                            'PAN',
+                                            'MDG',
+                                            'COL',
+                                            'CUB') ~ 'protect',
+                                TRUE ~ 'ignore')) %>% 
+  dplyr::filter(protection == 'protect') %>% 
+  distinct(ISO3, .keep_all = TRUE) %>% 
+  arrange(ISO3) %>% 
+  summarise(protect_area = sum(depth_100m))
+
+protect
+
+# area protected
+(protect[1]/hist[1]) * 100
+
+ext_miss <- data.frame(ISO3 = c('TLS','BRN', 'JPN',
+                                'HTI','DJI', 'IRQ',
+                                'CHN','TWN', 'SLV'),
+                       occurrence = 0)
+
+extinct <- 
+  spp_occ %>% 
+  dplyr::select(ISO3, occurrence) %>% 
+  rbind(ext_miss) %>% 
+  left_join(., shelf_raw, by = c('ISO3' = 'ISO_Ter1')) %>% 
+  dplyr::select(ISO3, occurrence, AllShelfAreaKM2_100mBathy) %>% 
+  dplyr::rename('depth_100m' = 'AllShelfAreaKM2_100mBathy') %>% 
+  mutate(protection = case_when(occurrence == 0 ~ 'extinct',
+                                ISO3 %in% c('JAM', 
+                                            'SGP', 
+                                            'GIN', 
+                                            'KHM',
+                                            'OMN') ~ 'extinct',
+                                TRUE ~ 'ignore')) %>% 
+  dplyr::filter(protection == 'extinct') %>% 
+  distinct(ISO3, .keep_all = TRUE) %>% 
+  arrange(ISO3) %>% 
+  summarise(extinct_area = sum(depth_100m))
 
 
+extinct
+# area lost
+(extinct[1]/hist[1])*100
+
+# Clean GBM Out Iterations --------------------------------------------------------------------
+# this code is old and slightly outdates
+rm(list=ls())
+
+setwd('/users/helenyan/desktop/school/directed studies 2018/datasets/gbm out/')
+
+old <- list.files(pattern="Iter1*")
+olddf <- lapply(old, read_csv)
+
+new <- list.files(pattern = "GBMResults2*")
+newdf <- lapply(new, read_csv)
+
+dfs <- list()
+for(i in 1:20) {
+  
+  dfs[[i]] <- 
+    olddf[[i]] %>% 
+    rbind(., olddf[[i + 20]]) %>% 
+    rbind(., newdf[[i]]) %>% 
+    dplyr::select(-X1) %>% 
+    group_by_(names(.)[c(1, 2)]) %>% 
+    summarise(totmean = mean(totalmean),
+              totmax = max(totalmax),
+              totmin = min(totalmin))
+  
+  dfscols <- colnames(dfs[[i]])
+  col <- dfscols[1] 
+  
+  write.csv(dfs[[i]], paste('CleanGBMout', col, '_190201.csv', sep = ''))
+  
+}
 
 
 
