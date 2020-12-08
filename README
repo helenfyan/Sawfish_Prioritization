@@ -1,0 +1,59 @@
+This repository goes through the analysis for the manuscript titled: Overfishing and habitat loss drives range contraction of iconic marine fishes to near extinction by HF Yan, PM Kyne, RW Jabado, RH Leeney, LNK Davidson, DH Derrick, B Finucci, RP Freckleton, SV Fordham, and NK Dulvy. The code was written by HF Yan. 
+
+We conducted the analyses using R v.3.5.2 on macOS 10.15.7 with the following sessionInfo()
+
+tidyverse 1.3.0
+gbm 2.1.4
+dismo 1.1-4
+ROCR 1.0-7
+ModelMetrics 1.2.2
+parallel 
+doSNOW 1.0.16
+foreach 1.4.4
+brms 2.10.0
+
+
+1. Data folder
+The file called OccurrenceData.csv is the data used to run the Boosted Regression Tree analyses and the dynamic geography analyses. The headers are as follows:
+
+logtotalGearTonnes: ln gear-specific marine fisheries landings
+logPprodMean: ln marine primary productivity
+logCoastPop: ln coastal population
+logEstDis: ln estuarine discharge rate
+logProteinDiet: ln marine protein consumption
+logGDP: ln Gross Domestic Produc
+HDI: Human Development Index
+logMang: ln mangrove area
+WGI: World Governance Index
+logChondCatch: ln chondrichthyan catch
+logShelfAreaShallow: ln continental shelf area (shallow)
+SstMean: mean sea surface temperature (ºC)
+logFishEffort: ln fishing effort
+speciesdwarf: dummy-coded species Pristis clavata
+speciesgreen: dummy-coded species Pristis zijsron
+specieslarge: dummy-coded species Pristis pristis
+speciesnarrow: dummy-coded species Anoxypristis cuspidata
+speciessmall: dummy-coded species Pristis pectinata
+
+Occurrence is coded as follows: 
+1 - present
+0 - extinct
+2 - Presence Uncertain
+
+Countries are coded using their ISO 3-letter country code as denoted by the United Nations. 
+
+2. Model Outputs folder
+DGmod.rds is the dynamic geography model (i.e., logistic regression of occurrence as a function of shelf area, mangrove area, gear-specific landings, and country ID as a grouping factor). 
+
+The BRT daughter folder has the 1000 bootstrapped dataframes for: (1) the relative influences of each variable, (2) the predictions on the test set, (3) the predictions for the Presence Uncertain nations, and (4) the model performance results. Note, these are all dated for 24 August 2020 as that was the last day that these models were run. 
+
+Within the BRT folder, there is a PDP daughter folder for the results of the predicted partial dependences of each variable. Again, these are also dated for 24 August 2020. 
+
+3. Analysis R script
+The analysis is run in parallel and thus requires multiple cores. The following model metrics are calulated within the parallel loop:
+
+cvauc - cross-validated AUC
+cvcorr - cross-validated correlation
+dev_exp - deviance explained
+evauc - evaluation AUC
+evdev - evaluation deviance
