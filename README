@@ -1,4 +1,4 @@
-This repository goes through the analysis for the manuscript titled: Overfishing and habitat loss drives range contraction of iconic marine fishes to near extinction by HF Yan, PM Kyne, RW Jabado, RH Leeney, LNK Davidson, DH Derrick, B Finucci, RP Freckleton, SV Fordham, and NK Dulvy. The code was written by HF Yan. 
+This repository goes through the analysis for the manuscript titled: Overfishing and habitat loss drives range contraction of iconic marine fishes to near extinction by HF Yan, PM Kyne, RW Jabado, RH Leeney, LNK Davidson, DH Derrick, B Finucci, RP Freckleton, SV Fordham, and NK Dulvy. The code was written by HF Yan. The paper can be found here: https://advances.sciencemag.org/content/7/7/eabb6026.
 
 We conducted the analyses using R v.3.5.2 on macOS 10.15.7 with the following sessionInfo()
 
